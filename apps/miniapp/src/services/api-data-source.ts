@@ -1,6 +1,7 @@
 import {
   emptyCart,
   type AfterSale,
+  type Announcement,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
@@ -252,5 +253,13 @@ export class ApiDataSource implements DataSource {
 
   async listAfterSalesByMerchant(merchantId: number): Promise<AfterSale[]> {
     return request<AfterSale[]>(`/aftersales?merchant_id=${merchantId}`);
+  }
+
+  async listAnnouncements(): Promise<Announcement[]> {
+    return request<Announcement[]>('/announcements');
+  }
+
+  async getAnnouncement(announcementId: number): Promise<Announcement | null> {
+    return request<Announcement | null>(`/announcements/${announcementId}`);
   }
 }

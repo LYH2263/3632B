@@ -1,11 +1,13 @@
 import {
   STORAGE_KEYS,
   emptyCart,
+  seedAnnouncements,
   seedCouponTemplates,
   seedMerchants,
   seedProducts,
   seedUsers,
   type AfterSale,
+  type Announcement,
   type Cart,
   type CouponRedeemRecord,
   type CouponTemplate,
@@ -18,7 +20,7 @@ import {
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 5;
+const MOCK_DB_VERSION = 6;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -41,6 +43,7 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.coupon_redeem_records, []);
     writeJSON(STORAGE_KEYS.reviews, []);
     writeJSON(STORAGE_KEYS.aftersales, []);
+    writeJSON(STORAGE_KEYS.announcements, seedAnnouncements);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -57,6 +60,7 @@ export function ensureMockDB(): void {
   ensureSeed<CouponRedeemRecord[]>(STORAGE_KEYS.coupon_redeem_records, []);
   ensureSeed<ProductReview[]>(STORAGE_KEYS.reviews, []);
   ensureSeed<AfterSale[]>(STORAGE_KEYS.aftersales, []);
+  ensureSeed<Announcement[]>(STORAGE_KEYS.announcements, seedAnnouncements);
 }
 
 export function readMerchants(): Merchant[] {
@@ -146,4 +150,13 @@ export function readAfterSales(): AfterSale[] {
 
 export function writeAfterSales(value: AfterSale[]): void {
   writeJSON(STORAGE_KEYS.aftersales, value);
+}
+
+export function readAnnouncements(): Announcement[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.announcements, seedAnnouncements);
+}
+
+export function writeAnnouncements(value: Announcement[]): void {
+  writeJSON(STORAGE_KEYS.announcements, value);
 }

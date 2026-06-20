@@ -1,4 +1,4 @@
-import type { Cart, CouponTemplate, Merchant, Product, User } from './types';
+import type { Announcement, Cart, CouponTemplate, Merchant, Product, User } from './types';
 
 export const seedUsers: User[] = [
   {
@@ -163,3 +163,33 @@ export const emptyCart: Cart = {
   items: [],
   updated_at: new Date(0).toISOString()
 };
+
+export const seedAnnouncements: Announcement[] = [
+  {
+    id: 1,
+    title: '社区停水通知',
+    content: '各位居民：\n因市政管道维修，本社区将于明日（6月21日）上午9:00-12:00暂停供水，请提前做好储水准备。\n\n如有疑问请联系物业：020-12345678',
+    valid_from: new Date(Date.now() - 86400000).toISOString(),
+    valid_to: new Date(Date.now() + 86400000 * 2).toISOString(),
+    is_pinned: true,
+    created_at: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    id: 2,
+    title: '端午节促销活动',
+    content: '端午佳节来临之际，社区商店全场满100减20！\n\n活动时间：6月22日-6月24日\n参与商家：鲜果超市、便民小超\n\n欢迎大家前来选购！',
+    valid_from: new Date(Date.now() - 86400000).toISOString(),
+    valid_to: new Date(Date.now() + 86400000 * 7).toISOString(),
+    is_pinned: false,
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString()
+  },
+  {
+    id: 3,
+    title: '快递驿站营业时间调整',
+    content: '自7月1日起，社区快递驿站营业时间调整为：\n工作日：8:00-20:00\n周末：9:00-18:00\n\n请合理安排取件时间。',
+    valid_from: new Date(Date.now() + 86400000 * 3).toISOString(),
+    valid_to: new Date(Date.now() + 86400000 * 30).toISOString(),
+    is_pinned: false,
+    created_at: new Date(Date.now() - 86400000).toISOString()
+  }
+];

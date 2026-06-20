@@ -59,6 +59,18 @@
       "style": {
         "navigationBarTitleText": "申请售后"
       }
+    },
+    {
+      "path": "pages/announcement/list",
+      "style": {
+        "navigationBarTitleText": "公告列表"
+      }
+    },
+    {
+      "path": "pages/announcement/detail",
+      "style": {
+        "navigationBarTitleText": "公告详情"
+      }
     }
   ],
   "globalStyle": {

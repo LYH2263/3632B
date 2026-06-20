@@ -11,7 +11,8 @@ export const STORAGE_KEYS = {
   user_coupons: 'community_store_user_coupons',
   coupon_redeem_records: 'community_store_coupon_redeem_records',
   reviews: 'community_store_reviews',
-  aftersales: 'community_store_aftersales'
+  aftersales: 'community_store_aftersales',
+  announcements: 'community_store_announcements'
 } as const;
 
 export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {

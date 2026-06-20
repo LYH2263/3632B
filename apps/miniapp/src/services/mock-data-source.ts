@@ -5,6 +5,7 @@ import {
   filterAvailableCoupons,
   validateUserCoupon,
   type AfterSale,
+  type Announcement,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
@@ -28,6 +29,7 @@ import {
 import {
   ensureMockDB,
   readAfterSales,
+  readAnnouncements,
   readCart,
   readCouponRedeemRecords,
   readCouponTemplates,
@@ -613,5 +615,24 @@ export class MockDataSource implements DataSource {
     return readAfterSales()
       .filter((a) => a.merchant_id === merchantId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async listAnnouncements(): Promise<Announcement[]> {
+    const now = new Date();
+    return readAnnouncements()
+      .filter((a) => new Date(a.valid_from) <= now && new Date(a.valid_to) >= now)
+      .sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) {
+          return a.is_pinned ? -1 : 1;
+        }
+        return b.created_at.localeCompare(a.created_at);
+      });
+  }
+
+  async getAnnouncement(announcementId: number): Promise<Announcement | null> {
+    const now = new Date();
+    return readAnnouncements().find(
+      (a) => a.id === announcementId && new Date(a.valid_from) <= now && new Date(a.valid_to) >= now
+    ) ?? null;
   }
 }

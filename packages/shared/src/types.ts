@@ -238,6 +238,16 @@ export interface ReviewAfterSalePayload {
   reject_remark?: string;
 }
 
+export interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  valid_from: string;
+  valid_to: string;
+  is_pinned: boolean;
+  created_at: string;
+}
+
 export interface DataSource {
   listMerchants(): Promise<Merchant[]>;
   getMerchant(merchantId: number): Promise<Merchant | null>;
@@ -282,4 +292,7 @@ export interface DataSource {
   createAfterSale(payload: CreateAfterSalePayload): Promise<AfterSale>;
   listAfterSalesByBuyer(buyerId: number): Promise<AfterSale[]>;
   listAfterSalesByMerchant(merchantId: number): Promise<AfterSale[]>;
+
+  listAnnouncements(): Promise<Announcement[]>;
+  getAnnouncement(announcementId: number): Promise<Announcement | null>;
 }

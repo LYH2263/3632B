@@ -21,7 +21,8 @@ INSTALLED_APPS = [
     'orders',
     'coupons',
     'reviews',
-    'aftersales'
+    'aftersales',
+    'announcements'
 ]
 
 MIDDLEWARE = [

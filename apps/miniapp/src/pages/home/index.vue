@@ -4,6 +4,8 @@
 
 		<view class="page-body">
 			<section data-testid="home-page">
+				<AnnouncementBar />
+
 				<div class="search-bar">
 					<label class="sr-only" for="home-search-input">搜索商家名称</label>
 					<input id="home-search-input" v-model="keyword" data-testid="home-search-input" placeholder="搜索商家名称" />
@@ -58,6 +60,7 @@ import type { Merchant } from '@community-store/shared'
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppTopBar from '../../components/AppTopBar.vue'
+import AnnouncementBar from '../../components/AnnouncementBar.vue'
 import { formatMoney } from '../../services/format'
 import { getDataSource } from '../../services/data-source'
 

@@ -20,6 +20,7 @@ from reviews.views import (
     ReviewReplyView
 )
 from aftersales.views import AfterSaleCreateView, AfterSaleListView, AfterSaleReviewView
+from announcements.views import AnnouncementListView, AnnouncementDetailView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -45,5 +46,7 @@ urlpatterns = [
     path('api/v1/reviews/pending', PendingReviewsView.as_view(), name='review-pending'),
     path('api/v1/aftersales', AfterSaleListView.as_view(), name='aftersale-list'),
     path('api/v1/aftersales/create', AfterSaleCreateView.as_view(), name='aftersale-create'),
-    path('api/v1/aftersales/<int:aftersale_id>/review', AfterSaleReviewView.as_view(), name='aftersale-review')
+    path('api/v1/aftersales/<int:aftersale_id>/review', AfterSaleReviewView.as_view(), name='aftersale-review'),
+    path('api/v1/announcements', AnnouncementListView.as_view(), name='announcement-list'),
+    path('api/v1/announcements/<int:announcement_id>', AnnouncementDetailView.as_view(), name='announcement-detail')
 ]
