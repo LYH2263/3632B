@@ -8,6 +8,7 @@ from common.auth import get_request_user
 from common.response import error_response, success_response
 from coupons.models import CouponRedeemRecord, UserCoupon
 from coupons.utils import validate_coupon_usage
+from membership.models import BuyerProfile
 from merchants.models import Merchant
 from products.models import Product
 from users.models import StoreUser
@@ -361,4 +362,15 @@ class OrderStatusUpdateView(APIView):
 
         order.status = next_status
         order.save(update_fields=['status', 'updated_at'])
+
+        if next_status == 'completed':
+            points_to_add = int(order.total_amount.to_integral_value())
+            if points_to_add > 0:
+                BuyerProfile.add_points(
+                    buyer_id=order.buyer_id,
+                    points=points_to_add,
+                    source='order_complete',
+                    source_id=order.id
+                )
+
         return success_response(OrderSerializer(order).data)

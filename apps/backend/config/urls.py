@@ -21,6 +21,7 @@ from reviews.views import (
 )
 from aftersales.views import AfterSaleCreateView, AfterSaleListView, AfterSaleReviewView
 from announcements.views import AnnouncementListView, AnnouncementDetailView
+from membership.views import BuyerProfileView, PointLogListView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -48,5 +49,7 @@ urlpatterns = [
     path('api/v1/aftersales/create', AfterSaleCreateView.as_view(), name='aftersale-create'),
     path('api/v1/aftersales/<int:aftersale_id>/review', AfterSaleReviewView.as_view(), name='aftersale-review'),
     path('api/v1/announcements', AnnouncementListView.as_view(), name='announcement-list'),
-    path('api/v1/announcements/<int:announcement_id>', AnnouncementDetailView.as_view(), name='announcement-detail')
+    path('api/v1/announcements/<int:announcement_id>', AnnouncementDetailView.as_view(), name='announcement-detail'),
+    path('api/v1/membership/profile', BuyerProfileView.as_view(), name='membership-profile'),
+    path('api/v1/membership/point-logs', PointLogListView.as_view(), name='membership-point-logs')
 ]

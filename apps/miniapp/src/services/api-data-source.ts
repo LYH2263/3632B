@@ -2,6 +2,7 @@ import {
   emptyCart,
   type AfterSale,
   type Announcement,
+  type BuyerProfile,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
@@ -15,6 +16,7 @@ import {
   type Merchant,
   type Order,
   type OrderStatus,
+  type PointLog,
   type Product,
   type ProductReview,
   type ProductReviewSummary,
@@ -261,5 +263,13 @@ export class ApiDataSource implements DataSource {
 
   async getAnnouncement(announcementId: number): Promise<Announcement | null> {
     return request<Announcement | null>(`/announcements/${announcementId}`);
+  }
+
+  async getBuyerProfile(): Promise<BuyerProfile> {
+    return request<BuyerProfile>('/membership/profile');
+  }
+
+  async listPointLogs(): Promise<PointLog[]> {
+    return request<PointLog[]>('/membership/point-logs');
   }
 }

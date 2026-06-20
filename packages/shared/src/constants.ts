@@ -1,4 +1,4 @@
-import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, FulfillmentType, OrderStatus } from './types';
+import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, FulfillmentType, MemberLevel, OrderStatus } from './types';
 
 export const STORAGE_KEYS = {
   merchants: 'community_store_merchants',
@@ -67,4 +67,22 @@ export const AFTERSALE_REJECT_REASON_LABELS: Record<AfterSaleRejectReason, strin
   wrong_procedure: '流程不符',
   timeout: '超出申请时限',
   other: '其他原因'
+};
+
+export const MEMBER_LEVEL_CONFIG: { threshold: number; name: MemberLevel; label: string }[] = [
+  { threshold: 0, name: 'L1', label: '普通会员' },
+  { threshold: 100, name: 'L2', label: '银卡会员' },
+  { threshold: 500, name: 'L3', label: '金卡会员' }
+];
+
+export const MEMBER_LEVEL_LABELS: Record<MemberLevel, string> = {
+  L1: '普通会员',
+  L2: '银卡会员',
+  L3: '金卡会员'
+};
+
+export const POINT_SOURCE_LABELS: Record<import('./types').PointSource, string> = {
+  order_complete: '订单完成奖励',
+  admin_adjust: '系统调整',
+  deduct: '积分抵扣'
 };

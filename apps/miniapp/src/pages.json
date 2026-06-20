@@ -71,6 +71,12 @@
       "style": {
         "navigationBarTitleText": "公告详情"
       }
+    },
+    {
+      "path": "pages/user/center",
+      "style": {
+        "navigationBarTitleText": "个人中心"
+      }
     }
   ],
   "globalStyle": {

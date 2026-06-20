@@ -13,6 +13,7 @@
 	<view class="app-nav" data-testid="miniapp-nav">
 		<button class="secondary" data-testid="nav-home" @click="jumpTo('pages/home/index')">商家列表</button>
 		<button class="secondary" data-testid="nav-order-list" @click="jumpTo('pages/order/list')">我的订单</button>
+		<button class="secondary" data-testid="nav-user-center" @click="jumpTo('pages/user/center')">个人中心</button>
 	</view>
 </template>
 

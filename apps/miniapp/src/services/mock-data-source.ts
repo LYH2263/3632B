@@ -6,6 +6,7 @@ import {
   validateUserCoupon,
   type AfterSale,
   type Announcement,
+  type BuyerProfile,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
@@ -19,6 +20,7 @@ import {
   type Merchant,
   type Order,
   type OrderStatus,
+  type PointLog,
   type Product,
   type ProductReview,
   type ProductReviewSummary,
@@ -639,5 +641,44 @@ export class MockDataSource implements DataSource {
     return readAnnouncements().find(
       (a) => a.id === announcementId && new Date(a.valid_from) <= now && new Date(a.valid_to) >= now
     ) ?? null;
+  }
+
+  async getBuyerProfile(): Promise<BuyerProfile> {
+    const users = readUsers();
+    const buyer = users.find((u) => u.role === 'buyer');
+    const completedOrders = readOrders().filter(
+      (o) => o.buyer_id === (buyer?.id ?? 1) && o.status === 'completed'
+    );
+    const totalEarned = completedOrders.reduce(
+      (sum, o) => sum + Math.floor(o.total_amount),
+      0
+    );
+    const level = totalEarned >= 500 ? 'L3' : totalEarned >= 100 ? 'L2' : 'L1';
+    return {
+      id: 1,
+      buyer_id: buyer?.id ?? 1,
+      nickname: buyer?.nickname ?? '买家',
+      points: totalEarned,
+      total_earned: totalEarned,
+      deductible_points: 0,
+      level: level as BuyerProfile['level'],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  async listPointLogs(): Promise<PointLog[]> {
+    const completedOrders = readOrders().filter((o) => o.status === 'completed');
+    return completedOrders.map((o, idx) => ({
+      id: idx + 1,
+      buyer_id: o.buyer_id,
+      change: Math.floor(o.total_amount),
+      balance_after: completedOrders
+        .slice(0, idx + 1)
+        .reduce((s, ord) => s + Math.floor(ord.total_amount), 0),
+      source: 'order_complete' as const,
+      source_id: o.id,
+      created_at: o.updated_at
+    }));
   }
 }

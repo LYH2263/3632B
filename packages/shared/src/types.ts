@@ -255,6 +255,32 @@ export interface Announcement {
   created_at: string;
 }
 
+export type MemberLevel = 'L1' | 'L2' | 'L3';
+
+export type PointSource = 'order_complete' | 'admin_adjust' | 'deduct';
+
+export interface BuyerProfile {
+  id: number;
+  buyer_id: number;
+  nickname: string;
+  points: number;
+  total_earned: number;
+  deductible_points: number;
+  level: MemberLevel;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PointLog {
+  id: number;
+  buyer_id: number;
+  change: number;
+  balance_after: number;
+  source: PointSource;
+  source_id: number;
+  created_at: string;
+}
+
 export interface DataSource {
   listMerchants(): Promise<Merchant[]>;
   getMerchant(merchantId: number): Promise<Merchant | null>;
@@ -302,4 +328,7 @@ export interface DataSource {
 
   listAnnouncements(): Promise<Announcement[]>;
   getAnnouncement(announcementId: number): Promise<Announcement | null>;
+
+  getBuyerProfile(): Promise<BuyerProfile>;
+  listPointLogs(): Promise<PointLog[]>;
 }
