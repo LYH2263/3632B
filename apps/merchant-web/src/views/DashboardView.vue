@@ -317,6 +317,100 @@
     </el-dialog>
 
     <el-dialog
+      v-model="rejectDialogVisible"
+      title="拒绝售后"
+      width="560px"
+      data-testid="web-aftersale-reject-dialog"
+    >
+      <el-form label-width="100px">
+        <el-form-item label="拒绝原因">
+          <el-select v-model="rejectReason" placeholder="请选择拒绝原因" data-testid="web-aftersale-reject-reason">
+            <el-option
+              v-for="(label, key) in AFTERSALE_REJECT_REASON_LABELS"
+              :key="key"
+              :label="label"
+              :value="key"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="补充说明">
+          <el-input
+            v-model="rejectRemark"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="请输入补充说明（选填）"
+            data-testid="web-aftersale-reject-remark"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button data-testid="web-aftersale-reject-cancel" @click="rejectDialogVisible = false">取消</el-button>
+        <el-button type="danger" data-testid="web-aftersale-reject-submit" @click="submitReject">确认拒绝</el-button>
+      </template>
+    </el-dialog>
+
+    <el-card class="block" ref="aftersaleSection" data-testid="web-aftersale-card">
+      <template #header>
+        <div class="block-title" data-testid="web-aftersale-card-title">售后审核</div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="aftersales" stripe data-testid="web-aftersale-table">
+        <el-table-column prop="order_no" label="订单号" min-width="200" />
+        <el-table-column label="退款原因" width="120">
+          <template #default="scope">{{ aftersaleReasonLabel(scope.row.reason) }}</template>
+        </el-table-column>
+        <el-table-column prop="description" label="说明" min-width="160" show-overflow-tooltip />
+        <el-table-column label="状态" width="100">
+          <template #default="scope">{{ aftersaleStatusLabel(scope.row.status) }}</template>
+        </el-table-column>
+        <el-table-column label="申请时间" min-width="160">
+          <template #default="scope">{{ new Date(scope.row.created_at).toLocaleString('zh-CN') }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="scope">
+            <template v-if="scope.row.status === 'pending'">
+              <el-space>
+                <el-button
+                  size="small"
+                  type="success"
+                  :data-testid="`web-aftersale-approve-${scope.row.id}`"
+                  @click="approveAfterSale(scope.row.id)"
+                >
+                  同意
+                </el-button>
+                <el-button
+                  size="small"
+                  type="danger"
+                  :data-testid="`web-aftersale-reject-${scope.row.id}`"
+                  @click="openRejectDialog(scope.row.id)"
+                >
+                  拒绝
+                </el-button>
+              </el-space>
+            </template>
+            <template v-else-if="scope.row.status === 'rejected'">
+              <span style="color: #f56c6c; font-size: 12px;">
+                拒绝原因：{{ aftersaleRejectReasonLabel(scope.row.reject_reason) }}
+                <template v-if="scope.row.reject_remark">（{{ scope.row.reject_remark }}）</template>
+              </span>
+            </template>
+            <template v-else>
+              <span style="color: #67c23a; font-size: 12px;">已退款</span>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!aftersales.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无售后申请
+      </div>
+    </el-card>
+
+    <el-dialog
       v-model="replyDialogVisible"
       title="回复评价"
       width="560px"
@@ -347,8 +441,12 @@
 
 <script setup lang="ts">
 import {
+  AFTERSALE_REASON_LABELS,
+  AFTERSALE_REJECT_REASON_LABELS,
+  AFTERSALE_STATUS_LABELS,
   ORDER_STATUS_LABELS,
   STATUS_TRANSITIONS,
+  type AfterSale,
   type CouponRedeemRecord,
   type Merchant,
   type Order,
@@ -370,6 +468,7 @@ const products = ref<Product[]>([]);
 const orders = ref<Order[]>([]);
 const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
 const reviews = ref<ProductReview[]>([]);
+const aftersales = ref<AfterSale[]>([]);
 
 const merchantForm = reactive({
   phone: '',
@@ -387,6 +486,10 @@ const activeOrder = ref<Order | null>(null);
 const replyDialogVisible = ref(false);
 const replyingReviewId = ref<number | null>(null);
 const replyContent = ref('');
+const rejectDialogVisible = ref(false);
+const rejectingAfterSaleId = ref<number | null>(null);
+const rejectReason = ref('');
+const rejectRemark = ref('');
 const productForm = reactive({
   name: '',
   price: 0,
@@ -402,6 +505,7 @@ const productSection = ref<{ $el: HTMLElement } | null>(null);
 const orderSection = ref<{ $el: HTMLElement } | null>(null);
 const couponSection = ref<{ $el: HTMLElement } | null>(null);
 const reviewSection = ref<{ $el: HTMLElement } | null>(null);
+const aftersaleSection = ref<{ $el: HTMLElement } | null>(null);
 const activeSection = ref('merchant');
 
 const sections = [
@@ -409,7 +513,8 @@ const sections = [
   { key: 'product', label: '商品管理' },
   { key: 'order', label: '订单管理' },
   { key: 'coupon', label: '核销记录' },
-  { key: 'review', label: '评价管理' }
+  { key: 'review', label: '评价管理' },
+  { key: 'aftersale', label: '售后审核' }
 ];
 
 const sectionRefs: Record<string, typeof merchantSection> = {
@@ -417,7 +522,8 @@ const sectionRefs: Record<string, typeof merchantSection> = {
   product: productSection,
   order: orderSection,
   coupon: couponSection,
-  review: reviewSection
+  review: reviewSection,
+  aftersale: aftersaleSection
 };
 
 const merchantId = computed(() => authUser.value?.merchant_id ?? 0);
@@ -479,6 +585,7 @@ async function loadData(): Promise<void> {
   orders.value = await merchantService.listOrdersByMerchant(merchantId.value);
   couponRedeemRecords.value = await merchantService.listCouponRedeemRecords(merchantId.value);
   reviews.value = await merchantService.listReviews(merchantId.value);
+  aftersales.value = await merchantService.listAfterSales(merchantId.value);
 }
 
 async function saveMerchant(): Promise<void> {
@@ -604,6 +711,60 @@ async function submitReply(): Promise<void> {
 function formatReviewDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleString('zh-CN');
+}
+
+function aftersaleStatusLabel(status: string): string {
+  return AFTERSALE_STATUS_LABELS[status as keyof typeof AFTERSALE_STATUS_LABELS] ?? status;
+}
+
+function aftersaleReasonLabel(reason: string): string {
+  return AFTERSALE_REASON_LABELS[reason as keyof typeof AFTERSALE_REASON_LABELS] ?? reason;
+}
+
+function aftersaleRejectReasonLabel(reason: string): string {
+  if (!reason) return '';
+  return AFTERSALE_REJECT_REASON_LABELS[reason as keyof typeof AFTERSALE_REJECT_REASON_LABELS] ?? reason;
+}
+
+async function approveAfterSale(aftersaleId: number): Promise<void> {
+  try {
+    await merchantService.reviewAfterSale(aftersaleId, 'approve');
+    ElMessage.success('已同意售后申请，订单已退款');
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+function openRejectDialog(aftersaleId: number): void {
+  rejectingAfterSaleId.value = aftersaleId;
+  rejectReason.value = '';
+  rejectRemark.value = '';
+  rejectDialogVisible.value = true;
+}
+
+async function submitReject(): Promise<void> {
+  if (!rejectingAfterSaleId.value) return;
+  if (!rejectReason.value) {
+    ElMessage.error('请选择拒绝原因');
+    return;
+  }
+  try {
+    await merchantService.reviewAfterSale(
+      rejectingAfterSaleId.value,
+      'reject',
+      rejectReason.value,
+      rejectRemark.value.trim()
+    );
+    ElMessage.success('已拒绝售后申请');
+    rejectDialogVisible.value = false;
+    rejectingAfterSaleId.value = null;
+    rejectReason.value = '';
+    rejectRemark.value = '';
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
 }
 
 function logout(): void {

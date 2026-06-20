@@ -69,7 +69,7 @@ const filterTabs: { label: string; value: FilterValue }[] = [
 ];
 
 const activeStatuses: OrderStatus[] = ['pending', 'confirmed', 'delivering'];
-const doneStatuses: OrderStatus[] = ['completed', 'canceled'];
+const doneStatuses: OrderStatus[] = ['completed', 'canceled', 'refunded'];
 
 const dataSource = getDataSource();
 const sessionStore = useSessionStore();

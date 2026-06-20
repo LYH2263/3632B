@@ -92,6 +92,20 @@
             去评价
           </button>
         </article>
+
+        <article class="card" v-if="showAfterSale" data-testid="order-detail-aftersale-card">
+          <button
+            class="primary"
+            data-testid="order-detail-aftersale-btn"
+            @click="goToAfterSale"
+          >
+            申请售后
+          </button>
+        </article>
+
+        <article class="card" v-if="order?.status === 'refunded'" data-testid="order-detail-refunded-card">
+          <p class="muted">该订单已退款</p>
+        </article>
       </section>
       <p v-else class="muted" data-testid="order-detail-not-found">订单不存在。</p>
     </view>
@@ -125,6 +139,10 @@ const showReview = computed(
   () => order.value?.status === 'completed'
 );
 
+const showAfterSale = computed(
+  () => order.value?.status === 'completed' || order.value?.status === 'delivering'
+);
+
 async function loadOrder(): Promise<void> {
   order.value = await dataSource.getOrder(orderId.value);
 }
@@ -153,6 +171,15 @@ function goToReview(): void {
     return;
   }
   navigateTo('pages/review/create', {
+    orderId: order.value.id
+  });
+}
+
+function goToAfterSale(): void {
+  if (!order.value) {
+    return;
+  }
+  navigateTo('pages/aftersale/apply', {
     orderId: order.value.id
   });
 }

@@ -5,7 +5,8 @@ export type OrderStatus =
   | 'confirmed'
   | 'delivering'
   | 'completed'
-  | 'canceled';
+  | 'canceled'
+  | 'refunded';
 
 export interface User {
   id: number;
@@ -202,6 +203,41 @@ export interface LoginResult {
   user: Omit<User, 'password'>;
 }
 
+export type AfterSaleReason = 'quality' | 'wrong' | 'damaged' | 'not_received' | 'other';
+
+export type AfterSaleStatus = 'pending' | 'approved' | 'rejected';
+
+export type AfterSaleRejectReason = 'evidence_insufficient' | 'wrong_procedure' | 'timeout' | 'other';
+
+export interface AfterSale {
+  id: number;
+  order_id: number;
+  buyer_id: number;
+  merchant_id: number;
+  order_no: string;
+  order_status: OrderStatus;
+  reason: AfterSaleReason;
+  description: string;
+  status: AfterSaleStatus;
+  reject_reason: string;
+  reject_remark: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateAfterSalePayload {
+  order_id: number;
+  reason: AfterSaleReason;
+  description?: string;
+}
+
+export interface ReviewAfterSalePayload {
+  aftersale_id: number;
+  action: 'approve' | 'reject';
+  reject_reason?: AfterSaleRejectReason;
+  reject_remark?: string;
+}
+
 export interface DataSource {
   listMerchants(): Promise<Merchant[]>;
   getMerchant(merchantId: number): Promise<Merchant | null>;
@@ -242,4 +278,8 @@ export interface DataSource {
   listReviewsByMerchant(merchantId: number): Promise<ProductReview[]>;
   replyReview(payload: ReplyReviewPayload): Promise<ProductReview>;
   getPendingReviewsByOrder(orderId: number): Promise<{ product_id: number; name: string; image_url: string; unit: string; price: number; quantity: number }[]>;
+
+  createAfterSale(payload: CreateAfterSalePayload): Promise<AfterSale>;
+  listAfterSalesByBuyer(buyerId: number): Promise<AfterSale[]>;
+  listAfterSalesByMerchant(merchantId: number): Promise<AfterSale[]>;
 }

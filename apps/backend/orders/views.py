@@ -24,7 +24,8 @@ STATUS_TRANSITIONS = {
     'confirmed': ['delivering'],
     'delivering': ['completed'],
     'completed': [],
-    'canceled': []
+    'canceled': [],
+    'refunded': []
 }
 
 

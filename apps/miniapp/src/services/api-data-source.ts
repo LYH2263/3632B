@@ -1,10 +1,12 @@
 import {
   emptyCart,
+  type AfterSale,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
   type CouponTemplate,
   type CouponValidationResult,
+  type CreateAfterSalePayload,
   type CreateReviewPayload,
   type DataSource,
   type LoginPayload,
@@ -235,5 +237,20 @@ export class ApiDataSource implements DataSource {
     return request<
       { product_id: number; name: string; image_url: string; unit: string; price: number; quantity: number }[]
     >(`/reviews/pending?order_id=${orderId}`);
+  }
+
+  async createAfterSale(payload: CreateAfterSalePayload): Promise<AfterSale> {
+    return request<AfterSale>('/aftersales/create', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async listAfterSalesByBuyer(buyerId: number): Promise<AfterSale[]> {
+    return request<AfterSale[]>(`/aftersales?buyer_id=${buyerId}`);
+  }
+
+  async listAfterSalesByMerchant(merchantId: number): Promise<AfterSale[]> {
+    return request<AfterSale[]>(`/aftersales?merchant_id=${merchantId}`);
   }
 }

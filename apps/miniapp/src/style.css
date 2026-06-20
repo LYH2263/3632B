@@ -396,6 +396,11 @@ a:focus-visible {
   color: #6b7280;
 }
 
+.status-refunded {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
 .checkout-bar {
   position: sticky;
   bottom: 0;

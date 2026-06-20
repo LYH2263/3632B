@@ -4,6 +4,7 @@ import {
   seedProducts,
   seedUsers,
   STORAGE_KEYS,
+  type AfterSale,
   type CouponRedeemRecord,
   type LoginPayload,
   type Merchant,
@@ -424,6 +425,77 @@ class MerchantService {
     };
     writeJSON(STORAGE_KEYS.reviews, reviews);
     return reviews[idx];
+  }
+
+  async listAfterSales(merchantId: number): Promise<AfterSale[]> {
+    if (this.config.dataMode === 'api') {
+      return request<AfterSale[]>(`/aftersales?merchant_id=${merchantId}`);
+    }
+
+    const aftersales = readJSON<AfterSale[]>(STORAGE_KEYS.aftersales, []);
+    return aftersales
+      .filter((a) => a.merchant_id === merchantId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async reviewAfterSale(
+    aftersaleId: number,
+    action: 'approve' | 'reject',
+    rejectReason?: string,
+    rejectRemark?: string
+  ): Promise<AfterSale> {
+    if (this.config.dataMode === 'api') {
+      return request<AfterSale>(`/aftersales/${aftersaleId}/review`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action,
+          reject_reason: rejectReason ?? '',
+          reject_remark: rejectRemark ?? ''
+        })
+      });
+    }
+
+    const aftersales = readJSON<AfterSale[]>(STORAGE_KEYS.aftersales, []);
+    const idx = aftersales.findIndex((a) => a.id === aftersaleId);
+    if (idx === -1) {
+      throw new Error('售后单不存在');
+    }
+    if (aftersales[idx].status !== 'pending') {
+      throw new Error('该售后单已处理');
+    }
+
+    if (action === 'approve') {
+      aftersales[idx] = {
+        ...aftersales[idx],
+        status: 'approved',
+        updated_at: new Date().toISOString()
+      };
+
+      const orders = readJSON<Order[]>(STORAGE_KEYS.orders, []);
+      const orderIdx = orders.findIndex((o) => o.id === aftersales[idx].order_id);
+      if (orderIdx !== -1) {
+        orders[orderIdx] = {
+          ...orders[orderIdx],
+          status: 'refunded',
+          updated_at: new Date().toISOString()
+        };
+        writeJSON(STORAGE_KEYS.orders, orders);
+      }
+    } else {
+      if (!rejectReason) {
+        throw new Error('拒绝时需填写或选择原因');
+      }
+      aftersales[idx] = {
+        ...aftersales[idx],
+        status: 'rejected',
+        reject_reason: rejectReason,
+        reject_remark: rejectRemark ?? '',
+        updated_at: new Date().toISOString()
+      };
+    }
+
+    writeJSON(STORAGE_KEYS.aftersales, aftersales);
+    return aftersales[idx];
   }
 }
 

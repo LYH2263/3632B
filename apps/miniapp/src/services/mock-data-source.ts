@@ -4,11 +4,13 @@ import {
   emptyCart,
   filterAvailableCoupons,
   validateUserCoupon,
+  type AfterSale,
   type Cart,
   type CheckoutPayload,
   type CouponRedeemRecord,
   type CouponTemplate,
   type CouponValidationResult,
+  type CreateAfterSalePayload,
   type CreateReviewPayload,
   type DataSource,
   type LoginPayload,
@@ -25,6 +27,7 @@ import {
 } from '@community-store/shared';
 import {
   ensureMockDB,
+  readAfterSales,
   readCart,
   readCouponRedeemRecords,
   readCouponTemplates,
@@ -34,6 +37,7 @@ import {
   readReviews,
   readUserCoupons,
   readUsers,
+  writeAfterSales,
   writeCart,
   writeCouponRedeemRecords,
   writeCouponTemplates,
@@ -556,5 +560,58 @@ export class MockDataSource implements DataSource {
           quantity: item.quantity
         };
       });
+  }
+
+  async createAfterSale(payload: CreateAfterSalePayload): Promise<AfterSale> {
+    const orders = readOrders();
+    const order = orders.find((o) => o.id === payload.order_id);
+    if (!order) {
+      throw new Error('订单不存在');
+    }
+
+    if (order.status !== 'completed' && order.status !== 'delivering') {
+      throw new Error('仅已完成或配送中的订单可申请售后');
+    }
+
+    const aftersales = readAfterSales();
+    const existing = aftersales.find(
+      (a) => a.order_id === payload.order_id && a.status === 'pending'
+    );
+    if (existing) {
+      throw new Error('该订单已有进行中的售后申请');
+    }
+
+    const now = new Date().toISOString();
+    const newAfterSale: AfterSale = {
+      id: nextId(aftersales),
+      order_id: payload.order_id,
+      buyer_id: order.buyer_id,
+      merchant_id: order.merchant_id,
+      order_no: order.order_no,
+      order_status: order.status,
+      reason: payload.reason,
+      description: payload.description ?? '',
+      status: 'pending',
+      reject_reason: '',
+      reject_remark: '',
+      created_at: now,
+      updated_at: now
+    };
+
+    aftersales.push(newAfterSale);
+    writeAfterSales(aftersales);
+    return newAfterSale;
+  }
+
+  async listAfterSalesByBuyer(buyerId: number): Promise<AfterSale[]> {
+    return readAfterSales()
+      .filter((a) => a.buyer_id === buyerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async listAfterSalesByMerchant(merchantId: number): Promise<AfterSale[]> {
+    return readAfterSales()
+      .filter((a) => a.merchant_id === merchantId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 }

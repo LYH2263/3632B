@@ -23,7 +23,7 @@ class OrderCreateSerializer(CartValidateSerializer):
 
 
 class OrderStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=['pending', 'confirmed', 'delivering', 'completed', 'canceled'])
+    status = serializers.ChoiceField(choices=['pending', 'confirmed', 'delivering', 'completed', 'canceled', 'refunded'])
 
 
 class OrderSerializer(serializers.ModelSerializer):

@@ -53,6 +53,12 @@
       "style": {
         "navigationBarTitleText": "领券中心"
       }
+    },
+    {
+      "path": "pages/aftersale/apply",
+      "style": {
+        "navigationBarTitleText": "申请售后"
+      }
     }
   ],
   "globalStyle": {

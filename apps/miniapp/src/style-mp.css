@@ -385,6 +385,11 @@ button[disabled]:active {
 	color: #9ca3af;
 }
 
+.status-refunded {
+	background: #fce7f3;
+	color: #9d174d;
+}
+
 .checkout-bar {
 	position: fixed;
 	bottom: 0;

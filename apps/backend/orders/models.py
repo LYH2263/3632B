@@ -7,7 +7,8 @@ class Order(models.Model):
         ('confirmed', 'confirmed'),
         ('delivering', 'delivering'),
         ('completed', 'completed'),
-        ('canceled', 'canceled')
+        ('canceled', 'canceled'),
+        ('refunded', 'refunded')
     )
 
     buyer = models.ForeignKey('users.StoreUser', on_delete=models.PROTECT, related_name='orders')
