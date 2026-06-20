@@ -149,6 +149,11 @@ export class MockDataSource implements DataSource {
       throw new Error('商家不存在');
     }
 
+    const fulfillmentType = payload.fulfillment_type ?? 'delivery';
+    if (fulfillmentType === 'pickup' && !merchant.supports_pickup) {
+      throw new Error('该商家不支持到店自提');
+    }
+
     const cart = readCart();
     const products = readProducts().filter(
       (item) => item.merchant_id === payload.merchant_id

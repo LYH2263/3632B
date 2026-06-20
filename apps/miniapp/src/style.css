@@ -1078,3 +1078,75 @@ button.small {
   color: var(--text-secondary);
   word-break: break-word;
 }
+
+.fulfillment-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fulfillment-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  background: #fff;
+  text-align: center;
+}
+
+.fulfillment-option:active {
+  background: var(--bg);
+}
+
+.fulfillment-option.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.fulfillment-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.fulfillment-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fulfillment-fee {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pickup-address {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.fulfillment-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.fulfillment-tag.delivery {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.fulfillment-tag.pickup {
+  background: var(--success-light);
+  color: var(--success);
+}

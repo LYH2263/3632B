@@ -12,18 +12,19 @@ class CartValidateSerializer(serializers.Serializer):
     merchant_id = serializers.IntegerField()
     cart_items = CartItemSerializer(many=True)
     coupon_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    fulfillment_type = serializers.ChoiceField(choices=['delivery', 'pickup'], default='delivery')
 
 
 class OrderCreateSerializer(CartValidateSerializer):
     buyer_id = serializers.IntegerField()
     receiver_name = serializers.CharField(max_length=50)
     receiver_phone = serializers.CharField(max_length=20)
-    receiver_address = serializers.CharField(max_length=255)
+    receiver_address = serializers.CharField(max_length=255, required=False, allow_blank=True)
     remark = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class OrderStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=['pending', 'confirmed', 'delivering', 'completed', 'canceled', 'refunded'])
+    status = serializers.ChoiceField(choices=['pending', 'confirmed', 'delivering', 'pickup_ready', 'completed', 'canceled', 'refunded'])
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -40,6 +41,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'merchant_id',
             'status',
             'pay_method',
+            'fulfillment_type',
             'receiver_name',
             'receiver_phone',
             'receiver_address',

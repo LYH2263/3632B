@@ -37,6 +37,8 @@ export interface RegisterMerchantPayload {
   min_order_amount?: number;
   delivery_fee?: number;
   is_open?: boolean;
+  supports_pickup?: boolean;
+  pickup_fee?: number;
 }
 
 function normalizeAuthSession(raw: unknown): AuthSession | null {
@@ -71,7 +73,7 @@ function writeAuthSession(session: AuthSession): void {
   writeJSON(AUTH_KEY, session);
 }
 
-const MOCK_DB_VERSION = 2;
+const MOCK_DB_VERSION = 3;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureMockStorage(): void {
@@ -230,7 +232,9 @@ class MerchantService {
       delivery_note: payload.delivery_note?.trim() || '请联系商家协商配送',
       min_order_amount: Number(payload.min_order_amount ?? 0),
       delivery_fee: Number(payload.delivery_fee ?? 0),
-      is_open: payload.is_open ?? true
+      is_open: payload.is_open ?? true,
+      supports_pickup: payload.supports_pickup ?? true,
+      pickup_fee: Number(payload.pickup_fee ?? 0)
     };
     merchants.push(merchant);
     writeMerchants(merchants);

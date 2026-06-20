@@ -46,6 +46,17 @@
         <el-form-item label="配送费">
           <el-input-number v-model="merchantForm.delivery_fee" data-testid="web-merchant-delivery-fee" :min="0" :step="1" />
         </el-form-item>
+        <el-form-item label="到店自提">
+          <el-switch
+            v-model="merchantForm.supports_pickup"
+            data-testid="web-merchant-supports-pickup"
+            active-text="支持"
+            inactive-text="不支持"
+          />
+        </el-form-item>
+        <el-form-item label="自提费">
+          <el-input-number v-model="merchantForm.pickup_fee" data-testid="web-merchant-pickup-fee" :min="0" :step="1" :disabled="!merchantForm.supports_pickup" />
+        </el-form-item>
         <el-form-item label="营业状态">
           <el-switch
             v-model="merchantForm.is_open"
@@ -110,9 +121,16 @@
           <template #default="scope">{{ formatMoney(scope.row.total_amount) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="120">
-          <template #default="scope">{{ statusLabel(scope.row.status) }}</template>
+          <template #default="scope">{{ statusLabel(scope.row.status, scope.row.fulfillment_type) }}</template>
         </el-table-column>
-        <el-table-column label="收货信息" min-width="180">
+        <el-table-column label="履约方式" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.fulfillment_type === 'pickup' ? 'warning' : 'primary'" size="small">
+              {{ fulfillmentTypeLabel(scope.row.fulfillment_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="联系信息" min-width="180">
           <template #default="scope">{{ scope.row.receiver_name }} / {{ scope.row.receiver_phone }}</template>
         </el-table-column>
         <el-table-column label="订单详情" width="120">
@@ -126,18 +144,18 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column label="状态推进" min-width="220">
+        <el-table-column label="状态推进" min-width="260">
           <template #default="scope">
             <el-space wrap>
               <el-button
-                v-for="next in nextStatuses(scope.row.status)"
+                v-for="next in nextStatuses(scope.row.status, scope.row.fulfillment_type)"
                 :key="`${scope.row.id}-${next}`"
                 size="small"
                 type="primary"
                 :data-testid="`web-order-status-${scope.row.id}-${next}`"
                 @click="updateOrderStatus(scope.row.id, next)"
               >
-                {{ statusLabel(next) }}
+                {{ statusLabel(next, scope.row.fulfillment_type) }}
               </el-button>
             </el-space>
           </template>
@@ -287,8 +305,9 @@
       <template v-if="activeOrder">
         <p data-testid="web-order-detail-order-no">订单号：{{ activeOrder.order_no }}</p>
         <p>支付方式：线下支付</p>
-        <p>收货人：{{ activeOrder.receiver_name }} / {{ activeOrder.receiver_phone }}</p>
-        <p>收货地址：{{ activeOrder.receiver_address }}</p>
+        <p>履约方式：{{ fulfillmentTypeLabel(activeOrder.fulfillment_type) }}</p>
+        <p>联系人：{{ activeOrder.receiver_name }} / {{ activeOrder.receiver_phone }}</p>
+        <p>{{ activeOrder.fulfillment_type === 'pickup' ? '自提地址' : '收货地址' }}：{{ activeOrder.receiver_address }}</p>
         <p>备注：{{ activeOrder.remark || '无' }}</p>
 
         <h4 style="margin: 12px 0 8px;">配货单</h4>
@@ -444,10 +463,12 @@ import {
   AFTERSALE_REASON_LABELS,
   AFTERSALE_REJECT_REASON_LABELS,
   AFTERSALE_STATUS_LABELS,
+  FULFILLMENT_TYPE_LABELS,
   ORDER_STATUS_LABELS,
   STATUS_TRANSITIONS,
   type AfterSale,
   type CouponRedeemRecord,
+  type FulfillmentType,
   type Merchant,
   type Order,
   type OrderStatus,
@@ -476,7 +497,9 @@ const merchantForm = reactive({
   delivery_note: '',
   min_order_amount: 0,
   delivery_fee: 0,
-  is_open: true
+  is_open: true,
+  supports_pickup: true,
+  pickup_fee: 0
 });
 
 const productDialogVisible = ref(false);
@@ -540,12 +563,29 @@ function formatMoney(value: number): string {
   return `¥${value.toFixed(2)}`;
 }
 
-function statusLabel(status: OrderStatus): string {
+function fulfillmentTypeLabel(type: FulfillmentType): string {
+  return FULFILLMENT_TYPE_LABELS[type];
+}
+
+function statusLabel(status: OrderStatus, fulfillmentType?: FulfillmentType): string {
+  if (status === 'confirmed' && fulfillmentType === 'pickup') {
+    return '待备货';
+  }
   return ORDER_STATUS_LABELS[status];
 }
 
-function nextStatuses(status: OrderStatus): OrderStatus[] {
-  return STATUS_TRANSITIONS[status].filter((item) => item !== 'canceled');
+function nextStatuses(status: OrderStatus, fulfillmentType?: FulfillmentType): OrderStatus[] {
+  const all = STATUS_TRANSITIONS[status];
+  const filtered = all.filter((item) => item !== 'canceled');
+  
+  if (fulfillmentType === 'pickup') {
+    return filtered.filter((s) => s !== 'delivering');
+  }
+  if (fulfillmentType === 'delivery') {
+    return filtered.filter((s) => s !== 'pickup_ready');
+  }
+  
+  return filtered;
 }
 
 function resetProductForm(): void {
@@ -566,6 +606,8 @@ function assignMerchantForm(value: Merchant): void {
   merchantForm.min_order_amount = value.min_order_amount;
   merchantForm.delivery_fee = value.delivery_fee;
   merchantForm.is_open = value.is_open;
+  merchantForm.supports_pickup = value.supports_pickup;
+  merchantForm.pickup_fee = value.pickup_fee;
 }
 
 async function loadData(): Promise<void> {
@@ -598,7 +640,9 @@ async function saveMerchant(): Promise<void> {
     delivery_note: merchantForm.delivery_note,
     min_order_amount: Number(merchantForm.min_order_amount),
     delivery_fee: Number(merchantForm.delivery_fee),
-    is_open: merchantForm.is_open
+    is_open: merchantForm.is_open,
+    supports_pickup: merchantForm.supports_pickup,
+    pickup_fee: Number(merchantForm.pickup_fee)
   });
   ElMessage.success('店铺信息已保存');
 }

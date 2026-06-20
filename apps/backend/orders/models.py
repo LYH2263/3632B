@@ -6,9 +6,15 @@ class Order(models.Model):
         ('pending', 'pending'),
         ('confirmed', 'confirmed'),
         ('delivering', 'delivering'),
+        ('pickup_ready', 'pickup_ready'),
         ('completed', 'completed'),
         ('canceled', 'canceled'),
         ('refunded', 'refunded')
+    )
+
+    FULFILLMENT_TYPE_CHOICES = (
+        ('delivery', 'delivery'),
+        ('pickup', 'pickup')
     )
 
     buyer = models.ForeignKey('users.StoreUser', on_delete=models.PROTECT, related_name='orders')
@@ -16,6 +22,7 @@ class Order(models.Model):
     order_no = models.CharField(max_length=40, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     pay_method = models.CharField(max_length=20, default='offline')
+    fulfillment_type = models.CharField(max_length=20, choices=FULFILLMENT_TYPE_CHOICES, default='delivery')
     receiver_name = models.CharField(max_length=50)
     receiver_phone = models.CharField(max_length=20)
     receiver_address = models.CharField(max_length=255)

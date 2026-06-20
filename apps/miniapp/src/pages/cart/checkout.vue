@@ -43,7 +43,10 @@
           </div>
 
           <p data-testid="checkout-items-amount">商品合计：<strong class="price">{{ formatMoney(itemsAmount) }}</strong></p>
-          <p data-testid="checkout-delivery-fee">配送费：<strong class="price">{{ formatMoney(merchant.delivery_fee) }}</strong></p>
+          <p data-testid="checkout-delivery-fee">
+            {{ form.fulfillment_type === 'pickup' ? '自提费' : '配送费' }}：
+            <strong class="price">{{ formatMoney(currentDeliveryFee) }}</strong>
+          </p>
           <p v-if="discountAmount > 0" data-testid="checkout-discount">优惠券抵扣：<strong class="price discount">-{{ formatMoney(discountAmount) }}</strong></p>
           <p data-testid="checkout-total-amount">总金额：<strong class="price">{{ formatMoney(totalAmount) }}</strong></p>
           <p v-if="itemsAmount < merchant.min_order_amount" class="muted" data-testid="checkout-min-order-tip">
@@ -72,15 +75,48 @@
 
         <p v-else class="muted" data-testid="checkout-cart-empty">购物车为空。</p>
 
+        <article class="card fulfillment-card" v-if="merchant && merchant.supports_pickup" data-testid="checkout-fulfillment-card">
+          <h3>履约方式</h3>
+          <view class="fulfillment-options">
+            <view
+              class="fulfillment-option"
+              :class="{ active: form.fulfillment_type === 'delivery' }"
+              data-testid="fulfillment-option-delivery"
+              @click="setFulfillmentType('delivery')"
+              @tap="setFulfillmentType('delivery')"
+            >
+              <view class="fulfillment-icon">🚚</view>
+              <view class="fulfillment-label">配送</view>
+              <view class="fulfillment-fee">运费 ¥{{ merchant.delivery_fee.toFixed(2) }}</view>
+            </view>
+            <view
+              class="fulfillment-option"
+              :class="{ active: form.fulfillment_type === 'pickup' }"
+              data-testid="fulfillment-option-pickup"
+              @click="setFulfillmentType('pickup')"
+              @tap="setFulfillmentType('pickup')"
+            >
+              <view class="fulfillment-icon">🏪</view>
+              <view class="fulfillment-label">自提</view>
+              <view class="fulfillment-fee">
+                {{ merchant.pickup_fee > 0 ? `自提费 ¥${merchant.pickup_fee.toFixed(2)}` : '免自提费' }}
+              </view>
+            </view>
+          </view>
+          <view v-if="form.fulfillment_type === 'pickup'" class="pickup-address" data-testid="checkout-pickup-address">
+            <text class="muted">自提地址：{{ merchant.address }}</text>
+          </view>
+        </article>
+
         <article class="card" data-testid="checkout-form-card">
-          <h3>收货信息</h3>
+          <h3>{{ form.fulfillment_type === 'pickup' ? '联系人信息' : '收货信息' }}</h3>
           <div class="field">
             <label for="checkout-receiver-name">姓名 *</label>
             <input
               id="checkout-receiver-name"
               v-model="form.receiver_name"
               data-testid="checkout-receiver-name"
-              placeholder="请输入收货人"
+              placeholder="请输入联系人姓名"
             />
           </div>
           <div class="field">
@@ -92,7 +128,7 @@
               placeholder="请输入手机号"
             />
           </div>
-          <div class="field">
+          <div class="field" v-if="form.fulfillment_type === 'delivery'">
             <label for="checkout-receiver-address">地址 *</label>
             <input
               id="checkout-receiver-address"
@@ -176,9 +212,11 @@
 
 <script setup lang="ts">
 import {
+  FULFILLMENT_TYPE_LABELS,
   validateCartForCheckout,
   validateCheckoutPayload,
   type CheckoutPayload,
+  type FulfillmentType,
   type Merchant,
   type Product,
   type UserCoupon
@@ -206,6 +244,7 @@ const selectedCouponId = ref<number | null>(null);
 const couponPickerVisible = ref(false);
 const loadingCoupons = ref(false);
 const form = reactive({
+  fulfillment_type: 'delivery' as FulfillmentType,
   receiver_name: '',
   receiver_phone: '',
   receiver_address: '',
@@ -256,11 +295,20 @@ const discountAmount = computed(() => {
   return selectedCoupon.value.template.discount_amount;
 });
 
+const currentDeliveryFee = computed(() => {
+  if (!merchant.value) {
+    return 0;
+  }
+  return form.fulfillment_type === 'pickup'
+    ? merchant.value.pickup_fee
+    : merchant.value.delivery_fee;
+});
+
 const totalAmount = computed(() => {
   if (!merchant.value) {
     return itemsAmount.value;
   }
-  const total = itemsAmount.value + merchant.value.delivery_fee - discountAmount.value;
+  const total = itemsAmount.value + currentDeliveryFee.value - discountAmount.value;
   return Math.max(0, total);
 });
 
@@ -289,11 +337,14 @@ async function loadAvailableCoupons(): Promise<void> {
   }
   try {
     loadingCoupons.value = true;
+    const fee = form.fulfillment_type === 'pickup'
+      ? merchant.value.pickup_fee
+      : merchant.value.delivery_fee;
     availableCoupons.value = await dataSource.listAvailableCouponsForCart(
       sessionStore.state.user.id,
       merchant.value.id,
       itemsAmount.value,
-      merchant.value.delivery_fee
+      fee
     );
     if (selectedCouponId.value) {
       const stillAvailable = availableCoupons.value.some(
@@ -308,6 +359,13 @@ async function loadAvailableCoupons(): Promise<void> {
   } finally {
     loadingCoupons.value = false;
   }
+}
+
+function setFulfillmentType(type: FulfillmentType): void {
+  if (type === 'pickup' && merchant.value && !merchant.value.supports_pickup) {
+    return;
+  }
+  form.fulfillment_type = type;
 }
 
 function openCouponPicker(): void {
@@ -358,6 +416,7 @@ async function submitOrder(): Promise<void> {
     const payload: CheckoutPayload & { coupon_id?: number } = {
       buyer_id: sessionStore.state.user.id,
       merchant_id: merchant.value.id,
+      fulfillment_type: form.fulfillment_type,
       receiver_name: form.receiver_name,
       receiver_phone: form.receiver_phone,
       receiver_address: form.receiver_address,
@@ -398,6 +457,15 @@ async function submitOrder(): Promise<void> {
 
 watch(
   () => itemsAmount.value,
+  () => {
+    if (merchant.value) {
+      loadAvailableCoupons();
+    }
+  }
+);
+
+watch(
+  () => form.fulfillment_type,
   () => {
     if (merchant.value) {
       loadAvailableCoupons();

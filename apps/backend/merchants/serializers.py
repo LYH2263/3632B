@@ -14,5 +14,7 @@ class MerchantSerializer(serializers.ModelSerializer):
             'delivery_note',
             'min_order_amount',
             'delivery_fee',
-            'is_open'
+            'is_open',
+            'supports_pickup',
+            'pickup_fee'
         ]

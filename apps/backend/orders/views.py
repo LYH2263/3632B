@@ -21,8 +21,9 @@ from .serializers import (
 
 STATUS_TRANSITIONS = {
     'pending': ['confirmed', 'canceled'],
-    'confirmed': ['delivering'],
+    'confirmed': ['delivering', 'pickup_ready'],
     'delivering': ['completed'],
+    'pickup_ready': ['completed'],
     'completed': [],
     'canceled': [],
     'refunded': []
@@ -102,6 +103,12 @@ class CartValidateView(APIView):
         if merchant is None:
             return error_response('商家不存在', status_code=404)
 
+        fulfillment_type = serializer.validated_data.get('fulfillment_type', 'delivery')
+        if fulfillment_type == 'pickup' and not merchant.supports_pickup:
+            return error_response('该商家不支持到店自提', status_code=400)
+
+        delivery_fee = merchant.pickup_fee if fulfillment_type == 'pickup' else merchant.delivery_fee
+
         errors, snapshots, items_amount = validate_cart(
             merchant,
             serializer.validated_data['cart_items']
@@ -126,7 +133,7 @@ class CartValidateView(APIView):
             valid, coupon_errors, discount = validate_coupon_usage(
                 user_coupon,
                 items_amount,
-                merchant.delivery_fee
+                delivery_fee
             )
             if not valid:
                 return error_response('优惠券不可用', errors=coupon_errors)
@@ -135,7 +142,7 @@ class CartValidateView(APIView):
             from coupons.serializers import UserCouponSerializer
             coupon_data = UserCouponSerializer(user_coupon).data
 
-        total_amount = items_amount + merchant.delivery_fee - discount_amount
+        total_amount = items_amount + delivery_fee - discount_amount
         if total_amount < 0:
             total_amount = Decimal('0')
 
@@ -144,7 +151,7 @@ class CartValidateView(APIView):
                 'valid': True,
                 'items_snapshot': snapshots,
                 'items_amount': float(items_amount),
-                'delivery_fee': float(merchant.delivery_fee),
+                'delivery_fee': float(delivery_fee),
                 'discount_amount': float(discount_amount),
                 'total_amount': float(total_amount),
                 'coupon': coupon_data
@@ -197,6 +204,19 @@ class OrderListView(APIView):
         if merchant is None:
             return error_response('商家不存在', status_code=404)
 
+        fulfillment_type = payload.get('fulfillment_type', 'delivery')
+        if fulfillment_type == 'pickup' and not merchant.supports_pickup:
+            return error_response('该商家不支持到店自提', status_code=400)
+
+        delivery_fee = merchant.pickup_fee if fulfillment_type == 'pickup' else merchant.delivery_fee
+
+        receiver_address = payload.get('receiver_address', '')
+        if fulfillment_type == 'pickup' and not receiver_address:
+            receiver_address = merchant.address
+
+        if fulfillment_type == 'delivery' and not receiver_address:
+            return error_response('配送订单收货地址必填', status_code=400)
+
         errors, snapshots, items_amount = validate_cart(merchant, payload['cart_items'])
         if errors:
             return error_response('下单失败', errors=errors)
@@ -217,7 +237,7 @@ class OrderListView(APIView):
             valid, coupon_errors, discount = validate_coupon_usage(
                 user_coupon,
                 items_amount,
-                merchant.delivery_fee
+                delivery_fee
             )
             if not valid:
                 return error_response('优惠券不可用', errors=coupon_errors)
@@ -228,7 +248,7 @@ class OrderListView(APIView):
             user_coupon.used_at = timezone.now()
             user_coupon.save(update_fields=['status', 'used_at'])
 
-        total_amount = items_amount + merchant.delivery_fee - discount_amount
+        total_amount = items_amount + delivery_fee - discount_amount
         if total_amount < 0:
             total_amount = Decimal('0')
 
@@ -238,12 +258,13 @@ class OrderListView(APIView):
             order_no=generate_order_no(),
             status='pending',
             pay_method='offline',
+            fulfillment_type=fulfillment_type,
             receiver_name=payload['receiver_name'],
             receiver_phone=payload['receiver_phone'],
-            receiver_address=payload['receiver_address'],
+            receiver_address=receiver_address,
             remark=payload.get('remark', ''),
             items_amount=items_amount,
-            delivery_fee=merchant.delivery_fee,
+            delivery_fee=delivery_fee,
             discount_amount=discount_amount,
             coupon=user_coupon,
             total_amount=total_amount,

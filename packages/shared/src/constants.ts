@@ -1,4 +1,4 @@
-import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, OrderStatus } from './types';
+import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, FulfillmentType, OrderStatus } from './types';
 
 export const STORAGE_KEYS = {
   merchants: 'community_store_merchants',
@@ -23,17 +23,24 @@ export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: '待确认',
-  confirmed: '待配送',
+  confirmed: '已确认',
   delivering: '配送中',
+  pickup_ready: '待自提',
   completed: '已完成',
   canceled: '已取消',
   refunded: '已退款'
 };
 
+export const FULFILLMENT_TYPE_LABELS: Record<FulfillmentType, string> = {
+  delivery: '配送',
+  pickup: '自提'
+};
+
 export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending: ['confirmed', 'canceled'],
-  confirmed: ['delivering'],
+  confirmed: ['delivering', 'pickup_ready'],
   delivering: ['completed'],
+  pickup_ready: ['completed'],
   completed: [],
   canceled: [],
   refunded: []

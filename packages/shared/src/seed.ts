@@ -97,7 +97,9 @@ export const seedMerchants: Merchant[] = [
     delivery_note: '2 公里内 30 分钟配送',
     min_order_amount: 25,
     delivery_fee: 3,
-    is_open: true
+    is_open: true,
+    supports_pickup: true,
+    pickup_fee: 0
   },
   {
     id: 2,
@@ -107,7 +109,9 @@ export const seedMerchants: Merchant[] = [
     delivery_note: '晚 10 点前配送',
     min_order_amount: 18,
     delivery_fee: 2,
-    is_open: true
+    is_open: true,
+    supports_pickup: false,
+    pickup_fee: 0
   }
 ];
 

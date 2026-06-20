@@ -14,8 +14,9 @@
           </div>
           <div class="order-detail-info">
             <p class="order-detail-info-item" data-testid="order-detail-pay-method"><span class="label">支付方式</span>线下支付</p>
-            <p class="order-detail-info-item" data-testid="order-detail-receiver"><span class="label">收货人</span>{{ order.receiver_name }} {{ order.receiver_phone }}</p>
-            <p class="order-detail-info-item" data-testid="order-detail-address"><span class="label">地址</span>{{ order.receiver_address }}</p>
+            <p class="order-detail-info-item" data-testid="order-detail-fulfillment-type"><span class="label">履约方式</span>{{ fulfillmentTypeLabel(order.fulfillment_type) }}</p>
+            <p class="order-detail-info-item" data-testid="order-detail-receiver"><span class="label">联系人</span>{{ order.receiver_name }} {{ order.receiver_phone }}</p>
+            <p class="order-detail-info-item" data-testid="order-detail-address"><span class="label">{{ order.fulfillment_type === 'pickup' ? '自提地址' : '收货地址' }}</span>{{ order.receiver_address }}</p>
             <p class="order-detail-info-item" data-testid="order-detail-remark"><span class="label">备注</span>{{ order.remark || '无' }}</p>
           </div>
         </article>
@@ -68,7 +69,7 @@
           </div>
           <div class="order-summary">
             <p class="order-summary-item" data-testid="order-detail-items-amount">商品合计：<strong class="price">{{ formatMoney(order.items_amount) }}</strong></p>
-            <p class="order-summary-item" data-testid="order-detail-delivery-fee">配送费：<strong class="price">{{ formatMoney(order.delivery_fee) }}</strong></p>
+            <p class="order-summary-item" data-testid="order-detail-delivery-fee">{{ order.fulfillment_type === 'pickup' ? '自提费' : '配送费' }}：<strong class="price">{{ formatMoney(order.delivery_fee) }}</strong></p>
             <template v-if="order.discount_amount && order.discount_amount > 0">
               <p class="order-summary-item order-discount" data-testid="order-detail-discount">
                 优惠券抵扣：
@@ -114,6 +115,8 @@
 
 <script setup lang="ts">
 import {
+  FULFILLMENT_TYPE_LABELS,
+  type FulfillmentType,
   type Order,
   type OrderStatus
 } from '@community-store/shared';
@@ -140,8 +143,12 @@ const showReview = computed(
 );
 
 const showAfterSale = computed(
-  () => order.value?.status === 'completed' || order.value?.status === 'delivering'
+  () => order.value?.status === 'completed' || order.value?.status === 'delivering' || order.value?.status === 'pickup_ready'
 );
+
+function fulfillmentTypeLabel(type: FulfillmentType): string {
+  return FULFILLMENT_TYPE_LABELS[type];
+}
 
 async function loadOrder(): Promise<void> {
   order.value = await dataSource.getOrder(orderId.value);

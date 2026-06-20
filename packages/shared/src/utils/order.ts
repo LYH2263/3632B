@@ -10,6 +10,7 @@ import { toMoney } from './number';
 import {
   buildProductMap,
   calculateItemsAmount,
+  getDeliveryFee,
   validateCartForCheckout,
   validateCheckoutPayload
 } from './validator';
@@ -71,9 +72,16 @@ export function createOrderFromCart(params: CreateOrderParams): Order {
   const productMap = buildProductMap(params.products);
   const itemsSnapshot = buildOrderSnapshot(params.cart, productMap);
   const itemsAmount = calculateItemsAmount(params.cart.items, productMap);
+  const fulfillmentType = params.payload.fulfillment_type ?? 'delivery';
+  const deliveryFee = getDeliveryFee(params.merchant, fulfillmentType);
   const discountAmount = params.discount_amount ?? 0;
-  const totalBeforeDiscount = itemsAmount + params.merchant.delivery_fee;
+  const totalBeforeDiscount = itemsAmount + deliveryFee;
   const totalAmount = toMoney(Math.max(0, totalBeforeDiscount - discountAmount));
+
+  let receiverAddress = params.payload.receiver_address;
+  if (fulfillmentType === 'pickup' && !receiverAddress) {
+    receiverAddress = params.merchant.address;
+  }
 
   return {
     id: params.orderId,
@@ -82,12 +90,13 @@ export function createOrderFromCart(params: CreateOrderParams): Order {
     merchant_id: params.merchant.id,
     status: 'pending',
     pay_method: 'offline',
+    fulfillment_type: fulfillmentType,
     receiver_name: params.payload.receiver_name,
     receiver_phone: params.payload.receiver_phone,
-    receiver_address: params.payload.receiver_address,
+    receiver_address: receiverAddress,
     remark: params.payload.remark ?? '',
     items_amount: itemsAmount,
-    delivery_fee: params.merchant.delivery_fee,
+    delivery_fee: deliveryFee,
     discount_amount: discountAmount,
     coupon_id: params.coupon_id,
     total_amount: totalAmount,

@@ -4,6 +4,7 @@ import type {
   CartItem,
   CartValidationResult,
   CheckoutPayload,
+  FulfillmentType,
   Merchant,
   OrderStatus,
   Product
@@ -100,11 +101,24 @@ export function validateCartForCheckout(
   };
 }
 
+export function getDeliveryFee(merchant: Merchant, fulfillmentType: FulfillmentType): number {
+  if (fulfillmentType === 'pickup') {
+    return merchant.pickup_fee ?? 0;
+  }
+  return merchant.delivery_fee;
+}
+
 export function validateCheckoutPayload(payload: CheckoutPayload): string[] {
   const errors: string[] = [];
 
+  if (!payload.fulfillment_type) {
+    errors.push('履约方式必填');
+  } else if (payload.fulfillment_type !== 'delivery' && payload.fulfillment_type !== 'pickup') {
+    errors.push('履约方式不合法');
+  }
+
   if (!payload.receiver_name?.trim()) {
-    errors.push('收货人姓名必填');
+    errors.push('联系人姓名必填');
   }
 
   if (!payload.receiver_phone?.trim()) {
@@ -113,7 +127,7 @@ export function validateCheckoutPayload(payload: CheckoutPayload): string[] {
     errors.push('手机号格式错误');
   }
 
-  if (!payload.receiver_address?.trim()) {
+  if (payload.fulfillment_type === 'delivery' && !payload.receiver_address?.trim()) {
     errors.push('收货地址必填');
   }
 

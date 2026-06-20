@@ -21,7 +21,9 @@ class Command(BaseCommand):
                 'delivery_note': '2 公里内 30 分钟配送',
                 'min_order_amount': 25,
                 'delivery_fee': 3,
-                'is_open': True
+                'is_open': True,
+                'supports_pickup': True,
+                'pickup_fee': 0
             }
         )
 
@@ -33,7 +35,9 @@ class Command(BaseCommand):
                 'delivery_note': '晚 10 点前配送',
                 'min_order_amount': 18,
                 'delivery_fee': 2,
-                'is_open': True
+                'is_open': True,
+                'supports_pickup': False,
+                'pickup_fee': 0
             }
         )
 

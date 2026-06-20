@@ -6,9 +6,11 @@ class Merchant(models.Model):
     phone = models.CharField(max_length=20)
     address = models.CharField(max_length=255)
     delivery_note = models.CharField(max_length=255)
-    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    min_order_amount = models.DecimalField(max_digits=10, decimal_places=2)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_open = models.BooleanField(default=True)
+    supports_pickup = models.BooleanField(default=True)
+    pickup_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

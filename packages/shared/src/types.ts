@@ -1,9 +1,12 @@
 export type UserRole = 'buyer' | 'merchant';
 
+export type FulfillmentType = 'delivery' | 'pickup';
+
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
   | 'delivering'
+  | 'pickup_ready'
   | 'completed'
   | 'canceled'
   | 'refunded';
@@ -27,6 +30,8 @@ export interface Merchant {
   min_order_amount: number;
   delivery_fee: number;
   is_open: boolean;
+  supports_pickup: boolean;
+  pickup_fee: number;
 }
 
 export interface Product {
@@ -68,6 +73,7 @@ export interface Order {
   merchant_id: number;
   status: OrderStatus;
   pay_method: 'offline';
+  fulfillment_type: FulfillmentType;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
@@ -85,6 +91,7 @@ export interface Order {
 export interface CheckoutPayload {
   buyer_id: number;
   merchant_id: number;
+  fulfillment_type: FulfillmentType;
   receiver_name: string;
   receiver_phone: string;
   receiver_address: string;
