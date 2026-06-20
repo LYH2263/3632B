@@ -48,6 +48,8 @@ interface CreateOrderParams {
   merchant: Merchant;
   cart: Cart;
   products: Product[];
+  discount_amount?: number;
+  coupon_id?: number;
 }
 
 export function createOrderFromCart(params: CreateOrderParams): Order {
@@ -69,7 +71,9 @@ export function createOrderFromCart(params: CreateOrderParams): Order {
   const productMap = buildProductMap(params.products);
   const itemsSnapshot = buildOrderSnapshot(params.cart, productMap);
   const itemsAmount = calculateItemsAmount(params.cart.items, productMap);
-  const totalAmount = toMoney(itemsAmount + params.merchant.delivery_fee);
+  const discountAmount = params.discount_amount ?? 0;
+  const totalBeforeDiscount = itemsAmount + params.merchant.delivery_fee;
+  const totalAmount = toMoney(Math.max(0, totalBeforeDiscount - discountAmount));
 
   return {
     id: params.orderId,
@@ -84,6 +88,8 @@ export function createOrderFromCart(params: CreateOrderParams): Order {
     remark: params.payload.remark ?? '',
     items_amount: itemsAmount,
     delivery_fee: params.merchant.delivery_fee,
+    discount_amount: discountAmount,
+    coupon_id: params.coupon_id,
     total_amount: totalAmount,
     items_snapshot: itemsSnapshot,
     created_at: now,

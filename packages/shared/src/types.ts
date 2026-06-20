@@ -73,6 +73,8 @@ export interface Order {
   remark: string;
   items_amount: number;
   delivery_fee: number;
+  discount_amount: number;
+  coupon_id?: number;
   total_amount: number;
   items_snapshot: OrderSnapshotItem[];
   created_at: string;
@@ -86,13 +88,68 @@ export interface CheckoutPayload {
   receiver_phone: string;
   receiver_address: string;
   remark?: string;
+  coupon_id?: number;
 }
 
 export interface CartValidationResult {
   valid: boolean;
   errors: string[];
   items_amount: number;
+  delivery_fee: number;
+  discount_amount: number;
   total_amount: number;
+  coupon?: UserCoupon | null;
+}
+
+export type CouponType = 'full_reduction';
+
+export type CouponStatus = 'available' | 'used' | 'expired';
+
+export interface CouponTemplate {
+  id: number;
+  name: string;
+  type: CouponType;
+  threshold_amount: number;
+  discount_amount: number;
+  valid_from: string;
+  valid_to: string;
+  total_quantity: number;
+  claimed_quantity: number;
+  per_user_limit: number;
+  include_delivery_fee: boolean;
+  description: string;
+}
+
+export interface UserCoupon {
+  id: number;
+  user_id: number;
+  template_id: number;
+  status: CouponStatus;
+  order_id?: number;
+  claimed_at: string;
+  used_at?: string;
+  template: CouponTemplate;
+}
+
+export interface CouponValidationResult {
+  valid: boolean;
+  errors: string[];
+  discount_amount: number;
+  final_amount: number;
+}
+
+export interface CouponRedeemRecord {
+  id: number;
+  user_coupon_id: number;
+  order_id: number;
+  merchant_id: number;
+  buyer_id: number;
+  discount_amount: number;
+  items_amount: number;
+  redeemed_at: string;
+  template_name: string;
+  order_no: string;
+  buyer_nickname: string;
 }
 
 export interface LoginPayload {
@@ -116,10 +173,27 @@ export interface DataSource {
   listOrdersByBuyer(buyerId: number): Promise<Order[]>;
   listOrdersByMerchant(merchantId: number): Promise<Order[]>;
   getOrder(orderId: number): Promise<Order | null>;
-  createOrder(payload: CheckoutPayload): Promise<Order>;
+  createOrder(payload: CheckoutPayload & { coupon_id?: number }): Promise<Order>;
   updateOrderStatus(orderId: number, status: OrderStatus): Promise<Order>;
   getCart(): Promise<Cart>;
   setCart(cart: Cart): Promise<Cart>;
   clearCart(): Promise<Cart>;
   login(payload: LoginPayload): Promise<LoginResult>;
+
+  listCouponTemplates(): Promise<CouponTemplate[]>;
+  claimCoupon(templateId: number): Promise<UserCoupon>;
+  listUserCoupons(userId: number, status?: CouponStatus): Promise<UserCoupon[]>;
+  validateCoupon(
+    couponId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<CouponValidationResult>;
+  listAvailableCouponsForCart(
+    userId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<UserCoupon[]>;
+  listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]>;
 }

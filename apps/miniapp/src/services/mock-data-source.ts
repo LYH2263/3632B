@@ -2,26 +2,39 @@ import {
   canTransitionStatus,
   createOrderFromCart,
   emptyCart,
+  filterAvailableCoupons,
+  validateUserCoupon,
   type Cart,
   type CheckoutPayload,
+  type CouponRedeemRecord,
+  type CouponTemplate,
+  type CouponValidationResult,
   type DataSource,
   type LoginPayload,
   type LoginResult,
   type Merchant,
   type Order,
   type OrderStatus,
-  type Product
+  type Product,
+  type UserCoupon,
+  type CouponStatus
 } from '@community-store/shared';
 import {
   ensureMockDB,
   readCart,
+  readCouponRedeemRecords,
+  readCouponTemplates,
   readMerchants,
   readOrders,
   readProducts,
+  readUserCoupons,
   readUsers,
   writeCart,
+  writeCouponRedeemRecords,
+  writeCouponTemplates,
   writeMerchants,
   writeOrders,
+  writeUserCoupons,
   writeProducts
 } from '../data/mock-db';
 
@@ -129,6 +142,35 @@ export class MockDataSource implements DataSource {
       (item) => item.merchant_id === payload.merchant_id
     );
 
+    let discountAmount = 0;
+    let couponId: number | undefined = undefined;
+    let userCoupon: UserCoupon | undefined = undefined;
+
+    if (payload.coupon_id) {
+      const userCoupons = readUserCoupons();
+      userCoupon = userCoupons.find((c) => c.id === payload.coupon_id);
+      if (!userCoupon) {
+        throw new Error('优惠券不存在');
+      }
+      if (userCoupon.user_id !== payload.buyer_id) {
+        throw new Error('无权使用该优惠券');
+      }
+
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const itemsAmount = cart.items.reduce((sum, item) => {
+        const product = productMap.get(item.product_id);
+        return sum + (product ? product.price * item.quantity : 0);
+      }, 0);
+
+      const validation = validateUserCoupon(userCoupon, itemsAmount, merchant.delivery_fee);
+      if (!validation.valid) {
+        throw new Error(validation.errors.join('；'));
+      }
+
+      discountAmount = validation.discount_amount;
+      couponId = payload.coupon_id;
+    }
+
     const orders = readOrders();
     const order = createOrderFromCart({
       orderId: nextId(orders),
@@ -136,8 +178,47 @@ export class MockDataSource implements DataSource {
       payload,
       merchant,
       cart,
-      products
+      products,
+      discount_amount: discountAmount,
+      coupon_id: couponId
     });
+
+    if (userCoupon && couponId) {
+      const userCoupons = readUserCoupons();
+      const couponIndex = userCoupons.findIndex((c) => c.id === couponId);
+      if (couponIndex !== -1) {
+        userCoupons[couponIndex] = {
+          ...userCoupons[couponIndex],
+          status: 'used' as const,
+          used_at: new Date().toISOString(),
+          order_id: order.id
+        };
+        writeUserCoupons(userCoupons);
+      }
+
+      const redeemRecords = readCouponRedeemRecords();
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const itemsAmount = cart.items.reduce((sum, item) => {
+        const product = productMap.get(item.product_id);
+        return sum + (product ? product.price * item.quantity : 0);
+      }, 0);
+
+      const newRecord: CouponRedeemRecord = {
+        id: nextId(redeemRecords),
+        user_coupon_id: couponId,
+        order_id: order.id,
+        merchant_id: payload.merchant_id,
+        buyer_id: payload.buyer_id,
+        discount_amount: discountAmount,
+        items_amount: itemsAmount,
+        redeemed_at: new Date().toISOString(),
+        template_name: userCoupon.template.name,
+        order_no: order.order_no,
+        buyer_nickname: ''
+      };
+      redeemRecords.push(newRecord);
+      writeCouponRedeemRecords(redeemRecords);
+    }
 
     orders.push(order);
     writeOrders(orders);
@@ -162,6 +243,25 @@ export class MockDataSource implements DataSource {
 
     if (!canTransitionStatus(target.status, status)) {
       throw new Error(`状态不可从 ${target.status} 变更为 ${status}`);
+    }
+
+    const isCancelPending = target.status === 'pending' && status === 'canceled';
+    if (isCancelPending && target.coupon_id) {
+      const userCoupons = readUserCoupons();
+      const couponIndex = userCoupons.findIndex((c) => c.id === target.coupon_id);
+      if (couponIndex !== -1) {
+        userCoupons[couponIndex] = {
+          ...userCoupons[couponIndex],
+          status: 'available' as const,
+          used_at: undefined,
+          order_id: undefined
+        };
+        writeUserCoupons(userCoupons);
+      }
+
+      const redeemRecords = readCouponRedeemRecords();
+      const filteredRecords = redeemRecords.filter((r) => r.order_id !== orderId);
+      writeCouponRedeemRecords(filteredRecords);
     }
 
     target.status = status;
@@ -212,5 +312,99 @@ export class MockDataSource implements DataSource {
         merchant_id: user.merchant_id
       }
     };
+  }
+
+  async listCouponTemplates(): Promise<CouponTemplate[]> {
+    const now = new Date();
+    return readCouponTemplates().filter(
+      (t) => new Date(t.valid_from) <= now && new Date(t.valid_to) >= now
+    );
+  }
+
+  async claimCoupon(templateId: number): Promise<UserCoupon> {
+    const templates = readCouponTemplates();
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) {
+      throw new Error('优惠券模板不存在');
+    }
+
+    const now = new Date();
+    if (now < new Date(template.valid_from)) {
+      throw new Error('优惠券尚未开始领取');
+    }
+    if (now > new Date(template.valid_to)) {
+      throw new Error('优惠券已过期，无法领取');
+    }
+
+    if (template.claimed_quantity >= template.total_quantity) {
+      throw new Error('优惠券已被领完');
+    }
+
+    const userCoupons = readUserCoupons();
+    const userCount = userCoupons.filter(
+      (c) => c.template_id === templateId && c.user_id === 1
+    ).length;
+    if (userCount >= template.per_user_limit) {
+      throw new Error(`每人限领 ${template.per_user_limit} 张，您已达上限`);
+    }
+
+    const newCoupon: UserCoupon = {
+      id: nextId(userCoupons),
+      user_id: 1,
+      template_id: templateId,
+      status: 'available',
+      claimed_at: new Date().toISOString(),
+      template: template
+    };
+
+    userCoupons.push(newCoupon);
+    writeUserCoupons(userCoupons);
+
+    template.claimed_quantity += 1;
+    writeCouponTemplates(templates);
+
+    return newCoupon;
+  }
+
+  async listUserCoupons(userId: number, status?: CouponStatus): Promise<UserCoupon[]> {
+    let coupons = readUserCoupons().filter((c) => c.user_id === userId);
+    if (status) {
+      coupons = coupons.filter((c) => c.status === status);
+    }
+    return coupons.sort((a, b) => b.claimed_at.localeCompare(a.claimed_at));
+  }
+
+  async validateCoupon(
+    couponId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<CouponValidationResult> {
+    const userCoupon = readUserCoupons().find((c) => c.id === couponId);
+    if (!userCoupon) {
+      throw new Error('优惠券不存在');
+    }
+    return validateUserCoupon(userCoupon, itemsAmount, deliveryFee);
+  }
+
+  async listAvailableCouponsForCart(
+    userId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<UserCoupon[]> {
+    const userCoupons = readUserCoupons().filter(
+      (c) => c.user_id === userId && c.status === 'available'
+    );
+    const available = filterAvailableCoupons(userCoupons, itemsAmount, deliveryFee);
+    return available.sort(
+      (a, b) => b.template.discount_amount - a.template.discount_amount
+    );
+  }
+
+  async listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]> {
+    return readCouponRedeemRecords()
+      .filter((r) => r.merchant_id === merchantId)
+      .sort((a, b) => b.redeemed_at.localeCompare(a.redeemed_at));
   }
 }

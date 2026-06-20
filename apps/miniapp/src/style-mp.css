@@ -847,6 +847,15 @@ button[disabled]:active {
 	font-size: 14px;
 }
 
+.order-discount {
+	color: var(--danger);
+}
+
+.order-discount .discount-price {
+	color: var(--danger);
+	font-weight: 600;
+}
+
 .order-total-row {
 	font-size: 15px;
 	font-weight: 600;

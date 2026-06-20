@@ -41,6 +41,12 @@
       "style": {
         "navigationBarTitleText": "订单详情"
       }
+    },
+    {
+      "path": "pages/coupon/center",
+      "style": {
+        "navigationBarTitleText": "领券中心"
+      }
     }
   ],
   "globalStyle": {

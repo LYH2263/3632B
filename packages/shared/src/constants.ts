@@ -1,4 +1,4 @@
-import type { OrderStatus } from './types';
+import type { CouponStatus, OrderStatus } from './types';
 
 export const STORAGE_KEYS = {
   merchants: 'community_store_merchants',
@@ -6,8 +6,17 @@ export const STORAGE_KEYS = {
   orders: 'community_store_orders',
   cart: 'community_store_cart',
   users: 'community_store_users',
-  auth: 'community_store_auth'
+  auth: 'community_store_auth',
+  coupon_templates: 'community_store_coupon_templates',
+  user_coupons: 'community_store_user_coupons',
+  coupon_redeem_records: 'community_store_coupon_redeem_records'
 } as const;
+
+export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {
+  available: '可使用',
+  used: '已使用',
+  expired: '已过期'
+};
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: '待确认',

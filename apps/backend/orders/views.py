@@ -6,6 +6,8 @@ from rest_framework.views import APIView
 
 from common.auth import get_request_user
 from common.response import error_response, success_response
+from coupons.models import CouponRedeemRecord, UserCoupon
+from coupons.utils import validate_coupon_usage
 from merchants.models import Merchant
 from products.models import Product
 from users.models import StoreUser
@@ -106,14 +108,45 @@ class CartValidateView(APIView):
         if errors:
             return error_response('购物车校验失败', errors=errors)
 
-        total_amount = items_amount + merchant.delivery_fee
+        coupon_id = serializer.validated_data.get('coupon_id')
+        discount_amount = Decimal('0')
+        coupon_data = None
+
+        if coupon_id:
+            user = get_request_user(request)
+            user_coupon = UserCoupon.objects.select_related('template').filter(
+                id=coupon_id
+            ).first()
+            if user_coupon is None:
+                return error_response('优惠券不存在', status_code=404)
+            if user and user_coupon.user_id != user.id:
+                return error_response('无权使用该优惠券', status_code=403)
+
+            valid, coupon_errors, discount = validate_coupon_usage(
+                user_coupon,
+                items_amount,
+                merchant.delivery_fee
+            )
+            if not valid:
+                return error_response('优惠券不可用', errors=coupon_errors)
+
+            discount_amount = discount
+            from coupons.serializers import UserCouponSerializer
+            coupon_data = UserCouponSerializer(user_coupon).data
+
+        total_amount = items_amount + merchant.delivery_fee - discount_amount
+        if total_amount < 0:
+            total_amount = Decimal('0')
+
         return success_response(
             {
                 'valid': True,
                 'items_snapshot': snapshots,
                 'items_amount': float(items_amount),
                 'delivery_fee': float(merchant.delivery_fee),
-                'total_amount': float(total_amount)
+                'discount_amount': float(discount_amount),
+                'total_amount': float(total_amount),
+                'coupon': coupon_data
             }
         )
 
@@ -167,7 +200,36 @@ class OrderListView(APIView):
         if errors:
             return error_response('下单失败', errors=errors)
 
-        total_amount = items_amount + merchant.delivery_fee
+        coupon_id = payload.get('coupon_id')
+        user_coupon = None
+        discount_amount = Decimal('0')
+
+        if coupon_id:
+            user_coupon = UserCoupon.objects.select_for_update().select_related('template').filter(
+                id=coupon_id
+            ).first()
+            if user_coupon is None:
+                return error_response('优惠券不存在', status_code=404)
+            if user_coupon.user_id != buyer.id:
+                return error_response('无权使用该优惠券', status_code=403)
+
+            valid, coupon_errors, discount = validate_coupon_usage(
+                user_coupon,
+                items_amount,
+                merchant.delivery_fee
+            )
+            if not valid:
+                return error_response('优惠券不可用', errors=coupon_errors)
+
+            discount_amount = discount
+
+            user_coupon.status = 'used'
+            user_coupon.used_at = timezone.now()
+            user_coupon.save(update_fields=['status', 'used_at'])
+
+        total_amount = items_amount + merchant.delivery_fee - discount_amount
+        if total_amount < 0:
+            total_amount = Decimal('0')
 
         order = Order.objects.create(
             buyer=buyer,
@@ -181,9 +243,24 @@ class OrderListView(APIView):
             remark=payload.get('remark', ''),
             items_amount=items_amount,
             delivery_fee=merchant.delivery_fee,
+            discount_amount=discount_amount,
+            coupon=user_coupon,
             total_amount=total_amount,
             items_snapshot=snapshots
         )
+
+        if user_coupon:
+            user_coupon.order = order
+            user_coupon.save(update_fields=['order'])
+
+            CouponRedeemRecord.objects.create(
+                user_coupon=user_coupon,
+                order=order,
+                merchant=merchant,
+                buyer=buyer,
+                discount_amount=discount_amount,
+                items_amount=items_amount
+            )
 
         for item in payload['cart_items']:
             product = Product.objects.filter(id=item['product_id'], merchant=merchant).first()
@@ -211,8 +288,9 @@ class OrderDetailView(APIView):
 
 
 class OrderStatusUpdateView(APIView):
+    @transaction.atomic
     def patch(self, request, order_id: int):
-        order = Order.objects.filter(id=order_id).first()
+        order = Order.objects.filter(id=order_id).select_related('coupon').first()
         if order is None:
             return error_response('订单不存在', status_code=404)
 
@@ -243,6 +321,21 @@ class OrderStatusUpdateView(APIView):
         allowed = STATUS_TRANSITIONS.get(order.status, [])
         if next_status not in allowed:
             return error_response('状态不可逆或非法迁移', status_code=400)
+
+        if next_status == 'canceled' and order.status == 'pending' and order.coupon_id:
+            user_coupon = UserCoupon.objects.select_for_update().filter(
+                id=order.coupon_id
+            ).first()
+            if user_coupon and user_coupon.status == 'used':
+                user_coupon.status = 'available'
+                user_coupon.used_at = None
+                user_coupon.order = None
+                user_coupon.save(update_fields=['status', 'used_at', 'order_id'])
+
+                CouponRedeemRecord.objects.filter(
+                    order=order,
+                    user_coupon=user_coupon
+                ).delete()
 
         order.status = next_status
         order.save(update_fields=['status', 'updated_at'])

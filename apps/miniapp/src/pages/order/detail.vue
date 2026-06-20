@@ -69,6 +69,12 @@
           <div class="order-summary">
             <p class="order-summary-item" data-testid="order-detail-items-amount">商品合计：<strong class="price">{{ formatMoney(order.items_amount) }}</strong></p>
             <p class="order-summary-item" data-testid="order-detail-delivery-fee">配送费：<strong class="price">{{ formatMoney(order.delivery_fee) }}</strong></p>
+            <template v-if="order.discount_amount && order.discount_amount > 0">
+              <p class="order-summary-item order-discount" data-testid="order-detail-discount">
+                优惠券抵扣：
+                <strong class="price discount-price">-{{ formatMoney(order.discount_amount) }}</strong>
+              </p>
+            </template>
             <p class="order-summary-item order-total-row" data-testid="order-detail-total-amount">总金额：<strong class="price total-price">{{ formatMoney(order.total_amount) }}</strong></p>
           </div>
         </article>

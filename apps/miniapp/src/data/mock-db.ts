@@ -1,18 +1,22 @@
 import {
   STORAGE_KEYS,
   emptyCart,
+  seedCouponTemplates,
   seedMerchants,
   seedProducts,
   seedUsers,
   type Cart,
+  type CouponRedeemRecord,
+  type CouponTemplate,
   type Merchant,
   type Order,
   type Product,
-  type User
+  type User,
+  type UserCoupon
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 2;
+const MOCK_DB_VERSION = 3;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -30,6 +34,9 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.merchants, seedMerchants);
     writeJSON(STORAGE_KEYS.products, seedProducts);
     writeJSON(STORAGE_KEYS.users, seedUsers);
+    writeJSON(STORAGE_KEYS.coupon_templates, seedCouponTemplates);
+    writeJSON(STORAGE_KEYS.user_coupons, []);
+    writeJSON(STORAGE_KEYS.coupon_redeem_records, []);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -41,6 +48,9 @@ export function ensureMockDB(): void {
     updated_at: new Date().toISOString()
   });
   ensureSeed<User[]>(STORAGE_KEYS.users, seedUsers);
+  ensureSeed<CouponTemplate[]>(STORAGE_KEYS.coupon_templates, seedCouponTemplates);
+  ensureSeed<UserCoupon[]>(STORAGE_KEYS.user_coupons, []);
+  ensureSeed<CouponRedeemRecord[]>(STORAGE_KEYS.coupon_redeem_records, []);
 }
 
 export function readMerchants(): Merchant[] {
@@ -85,4 +95,31 @@ export function writeCart(value: Cart): void {
 export function readUsers(): User[] {
   ensureMockDB();
   return readJSON(STORAGE_KEYS.users, seedUsers);
+}
+
+export function readCouponTemplates(): CouponTemplate[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.coupon_templates, seedCouponTemplates);
+}
+
+export function writeCouponTemplates(value: CouponTemplate[]): void {
+  writeJSON(STORAGE_KEYS.coupon_templates, value);
+}
+
+export function readUserCoupons(): UserCoupon[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.user_coupons, []);
+}
+
+export function writeUserCoupons(value: UserCoupon[]): void {
+  writeJSON(STORAGE_KEYS.user_coupons, value);
+}
+
+export function readCouponRedeemRecords(): CouponRedeemRecord[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.coupon_redeem_records, []);
+}
+
+export function writeCouponRedeemRecords(value: CouponRedeemRecord[]): void {
+  writeJSON(STORAGE_KEYS.coupon_redeem_records, value);
 }

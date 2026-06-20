@@ -1,4 +1,4 @@
-import type { Cart, Merchant, Product, User } from './types';
+import type { Cart, CouponTemplate, Merchant, Product, User } from './types';
 
 export const seedUsers: User[] = [
   {
@@ -26,6 +26,65 @@ export const seedUsers: User[] = [
     merchant_id: 2,
     nickname: '便民小超店主',
     phone: '13900002222'
+  }
+];
+
+function getSeedDateRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(now.getDate() - 7);
+  const to = new Date(now);
+  to.setDate(now.getDate() + 30);
+  return {
+    from: from.toISOString(),
+    to: to.toISOString()
+  };
+}
+
+const seedDateRange = getSeedDateRange();
+
+export const seedCouponTemplates: CouponTemplate[] = [
+  {
+    id: 1,
+    name: '新人专享满30减10',
+    type: 'full_reduction',
+    threshold_amount: 30,
+    discount_amount: 10,
+    valid_from: seedDateRange.from,
+    valid_to: seedDateRange.to,
+    total_quantity: 100,
+    claimed_quantity: 0,
+    per_user_limit: 1,
+    include_delivery_fee: false,
+    description: '新用户专享，满30元减10元，不含配送费'
+  },
+  {
+    id: 2,
+    name: '满50减15',
+    type: 'full_reduction',
+    threshold_amount: 50,
+    discount_amount: 15,
+    valid_from: seedDateRange.from,
+    valid_to: seedDateRange.to,
+    total_quantity: 200,
+    claimed_quantity: 0,
+    per_user_limit: 2,
+    include_delivery_fee: true,
+    description: '满50元减15元，含配送费'
+  },
+  {
+    id: 3,
+    name: '满100减30',
+    type: 'full_reduction',
+    threshold_amount: 100,
+    discount_amount: 30,
+    valid_from: seedDateRange.from,
+    valid_to: seedDateRange.to,
+    total_quantity: 50,
+    claimed_quantity: 0,
+    per_user_limit: 1,
+    include_delivery_fee: true,
+    description: '满100元减30元，含配送费'
   }
 ];
 

@@ -146,6 +146,37 @@
       </div>
     </el-card>
 
+    <el-card class="block" ref="couponSection" data-testid="web-coupon-card">
+      <template #header>
+        <div class="block-title" data-testid="web-coupon-card-title">优惠券核销记录</div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="couponRedeemRecords" stripe data-testid="web-coupon-table">
+        <el-table-column prop="template_name" label="优惠券名称" min-width="160" />
+        <el-table-column prop="order_no" label="关联订单号" min-width="200" />
+        <el-table-column prop="buyer_nickname" label="买家" width="120" />
+        <el-table-column label="商品金额" width="120">
+          <template #default="scope">¥{{ Number(scope.row.items_amount).toFixed(2) }}</template>
+        </el-table-column>
+        <el-table-column label="抵扣金额" width="120">
+          <template #default="scope">
+            <span style="color: #f56c6c; font-weight: 600;">-¥{{ Number(scope.row.discount_amount).toFixed(2) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="redeemed_at" label="核销时间" min-width="180">
+          <template #default="scope">
+            {{ new Date(scope.row.redeemed_at).toLocaleString('zh-CN') }}
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!couponRedeemRecords.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无核销记录
+      </div>
+    </el-card>
+
     <el-dialog
       v-model="productDialogVisible"
       :title="editingProductId ? '编辑商品' : '新增商品'"
@@ -228,6 +259,7 @@
 import {
   ORDER_STATUS_LABELS,
   STATUS_TRANSITIONS,
+  type CouponRedeemRecord,
   type Merchant,
   type Order,
   type OrderStatus,
@@ -245,6 +277,7 @@ const authUser = ref<Omit<User, 'password'> | null>(merchantService.getAuthUser(
 const merchant = ref<Merchant | null>(null);
 const products = ref<Product[]>([]);
 const orders = ref<Order[]>([]);
+const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
 
 const merchantForm = reactive({
   phone: '',
@@ -272,18 +305,21 @@ const productForm = reactive({
 const merchantSection = ref<{ $el: HTMLElement } | null>(null);
 const productSection = ref<{ $el: HTMLElement } | null>(null);
 const orderSection = ref<{ $el: HTMLElement } | null>(null);
+const couponSection = ref<{ $el: HTMLElement } | null>(null);
 const activeSection = ref('merchant');
 
 const sections = [
   { key: 'merchant', label: '店铺信息' },
   { key: 'product', label: '商品管理' },
-  { key: 'order', label: '订单管理' }
+  { key: 'order', label: '订单管理' },
+  { key: 'coupon', label: '核销记录' }
 ];
 
 const sectionRefs: Record<string, typeof merchantSection> = {
   merchant: merchantSection,
   product: productSection,
-  order: orderSection
+  order: orderSection,
+  coupon: couponSection
 };
 
 const merchantId = computed(() => authUser.value?.merchant_id ?? 0);
@@ -343,6 +379,7 @@ async function loadData(): Promise<void> {
 
   products.value = await merchantService.listProducts(merchantId.value);
   orders.value = await merchantService.listOrdersByMerchant(merchantId.value);
+  couponRedeemRecords.value = await merchantService.listCouponRedeemRecords(merchantId.value);
 }
 
 async function saveMerchant(): Promise<void> {

@@ -2,13 +2,18 @@ import {
   emptyCart,
   type Cart,
   type CheckoutPayload,
+  type CouponRedeemRecord,
+  type CouponTemplate,
+  type CouponValidationResult,
   type DataSource,
   type LoginPayload,
   type LoginResult,
   type Merchant,
   type Order,
   type OrderStatus,
-  type Product
+  type Product,
+  type UserCoupon,
+  type CouponStatus
 } from '@community-store/shared';
 import { readJSON, writeJSON } from '../data/storage';
 import { request } from './http';
@@ -88,13 +93,14 @@ export class ApiDataSource implements DataSource {
     return request<Order | null>(`/orders/${orderId}`);
   }
 
-  async createOrder(payload: CheckoutPayload): Promise<Order> {
+  async createOrder(payload: CheckoutPayload & { coupon_id?: number }): Promise<Order> {
     const cart = readApiCart();
     const order = await request<Order>('/orders', {
       method: 'POST',
       body: JSON.stringify({
         ...payload,
-        cart_items: cart.items
+        cart_items: cart.items,
+        coupon_id: payload.coupon_id
       })
     });
     await this.clearCart();
@@ -135,5 +141,59 @@ export class ApiDataSource implements DataSource {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+  }
+
+  async listCouponTemplates(): Promise<CouponTemplate[]> {
+    return request<CouponTemplate[]>('/coupon/templates');
+  }
+
+  async claimCoupon(templateId: number): Promise<UserCoupon> {
+    return request<UserCoupon>('/coupon/claim', {
+      method: 'POST',
+      body: JSON.stringify({ template_id: templateId })
+    });
+  }
+
+  async listUserCoupons(userId: number, status?: CouponStatus): Promise<UserCoupon[]> {
+    const params = new URLSearchParams();
+    if (status) {
+      params.set('status', status);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<UserCoupon[]>(`/coupon/my${query}`);
+  }
+
+  async validateCoupon(
+    couponId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<CouponValidationResult> {
+    return request<CouponValidationResult>('/coupon/validate', {
+      method: 'POST',
+      body: JSON.stringify({
+        coupon_id: couponId,
+        merchant_id: merchantId,
+        items_amount: itemsAmount,
+        delivery_fee: deliveryFee
+      })
+    });
+  }
+
+  async listAvailableCouponsForCart(
+    userId: number,
+    merchantId: number,
+    itemsAmount: number,
+    deliveryFee: number
+  ): Promise<UserCoupon[]> {
+    const params = new URLSearchParams();
+    params.set('merchant_id', String(merchantId));
+    params.set('items_amount', String(itemsAmount));
+    params.set('delivery_fee', String(deliveryFee));
+    return request<UserCoupon[]>(`/coupon/available?${params.toString()}`);
+  }
+
+  async listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]> {
+    return request<CouponRedeemRecord[]>(`/coupon/redeem-records?merchant_id=${merchantId}`);
   }
 }

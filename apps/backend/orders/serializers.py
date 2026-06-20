@@ -11,6 +11,7 @@ class CartItemSerializer(serializers.Serializer):
 class CartValidateSerializer(serializers.Serializer):
     merchant_id = serializers.IntegerField()
     cart_items = CartItemSerializer(many=True)
+    coupon_id = serializers.IntegerField(required=False, allow_null=True, default=None)
 
 
 class OrderCreateSerializer(CartValidateSerializer):
@@ -28,6 +29,7 @@ class OrderStatusSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     buyer_id = serializers.IntegerField(source='buyer.id', read_only=True)
     merchant_id = serializers.IntegerField(source='merchant.id', read_only=True)
+    coupon_id = serializers.IntegerField(source='coupon.id', read_only=True, allow_null=True)
 
     class Meta:
         model = Order
@@ -44,6 +46,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'remark',
             'items_amount',
             'delivery_fee',
+            'discount_amount',
+            'coupon_id',
             'total_amount',
             'items_snapshot',
             'created_at',

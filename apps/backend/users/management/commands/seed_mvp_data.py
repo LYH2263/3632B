@@ -1,6 +1,9 @@
+from datetime import timedelta
 from django.contrib.auth.hashers import make_password
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
+from coupons.models import CouponTemplate
 from merchants.models import Merchant
 from products.models import Product
 from users.models import StoreUser
@@ -33,6 +36,58 @@ class Command(BaseCommand):
                 'is_open': True
             }
         )
+
+        now = timezone.now()
+        valid_from = now - timedelta(days=7)
+        valid_to = now + timedelta(days=30)
+
+        coupons = [
+            {
+                'name': '新人专享满30减10',
+                'type': 'full_reduction',
+                'threshold_amount': 30,
+                'discount_amount': 10,
+                'valid_from': valid_from,
+                'valid_to': valid_to,
+                'total_quantity': 100,
+                'claimed_quantity': 0,
+                'per_user_limit': 1,
+                'include_delivery_fee': False,
+                'description': '新用户专享，满30元减10元，不含配送费'
+            },
+            {
+                'name': '满50减15',
+                'type': 'full_reduction',
+                'threshold_amount': 50,
+                'discount_amount': 15,
+                'valid_from': valid_from,
+                'valid_to': valid_to,
+                'total_quantity': 200,
+                'claimed_quantity': 0,
+                'per_user_limit': 2,
+                'include_delivery_fee': True,
+                'description': '满50元减15元，含配送费'
+            },
+            {
+                'name': '满100减30',
+                'type': 'full_reduction',
+                'threshold_amount': 100,
+                'discount_amount': 30,
+                'valid_from': valid_from,
+                'valid_to': valid_to,
+                'total_quantity': 50,
+                'claimed_quantity': 0,
+                'per_user_limit': 1,
+                'include_delivery_fee': True,
+                'description': '满100元减30元，含配送费'
+            }
+        ]
+
+        for coupon_data in coupons:
+            CouponTemplate.objects.get_or_create(
+                name=coupon_data['name'],
+                defaults=coupon_data
+            )
 
         products = [
             {

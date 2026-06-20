@@ -44,11 +44,32 @@
 
           <p data-testid="checkout-items-amount">商品合计：<strong class="price">{{ formatMoney(itemsAmount) }}</strong></p>
           <p data-testid="checkout-delivery-fee">配送费：<strong class="price">{{ formatMoney(merchant.delivery_fee) }}</strong></p>
+          <p v-if="discountAmount > 0" data-testid="checkout-discount">优惠券抵扣：<strong class="price discount">-{{ formatMoney(discountAmount) }}</strong></p>
           <p data-testid="checkout-total-amount">总金额：<strong class="price">{{ formatMoney(totalAmount) }}</strong></p>
           <p v-if="itemsAmount < merchant.min_order_amount" class="muted" data-testid="checkout-min-order-tip">
             当前未达到起送价：{{ formatMoney(merchant.min_order_amount) }}
           </p>
         </article>
+
+        <article class="card coupon-card" data-testid="checkout-coupon-card" @click="openCouponPicker" @tap="openCouponPicker">
+          <view class="coupon-card-header">
+            <span class="coupon-icon">🎫</span>
+            <span class="coupon-label">优惠券</span>
+          </view>
+          <view class="coupon-card-content">
+            <template v-if="selectedCoupon">
+              <span class="coupon-name">{{ selectedCoupon.template.name }}</span>
+              <span class="coupon-discount">-¥{{ selectedCoupon.template.discount_amount.toFixed(2) }}</span>
+            </template>
+            <template v-else>
+              <span class="coupon-placeholder">
+                {{ availableCoupons.length > 0 ? `${availableCoupons.length} 张可用` : '暂无可用优惠券' }}
+              </span>
+            </template>
+            <span class="coupon-arrow">›</span>
+          </view>
+        </article>
+
         <p v-else class="muted" data-testid="checkout-cart-empty">购物车为空。</p>
 
         <article class="card" data-testid="checkout-form-card">
@@ -104,6 +125,50 @@
         </article>
       </section>
 
+      <view v-if="couponPickerVisible" class="coupon-picker-mask" @click="closeCouponPicker" @tap="closeCouponPicker">
+        <view class="coupon-picker-panel" @click.stop @tap.stop>
+          <view class="coupon-picker-header">
+            <text class="coupon-picker-title">选择优惠券</text>
+            <text class="coupon-picker-close" @click="closeCouponPicker" @tap="closeCouponPicker">✕</text>
+          </view>
+          <scroll-view class="coupon-picker-list" scroll-y>
+            <view
+              class="coupon-item"
+              :class="{ selected: selectedCouponId === null }"
+              @click="selectCoupon(null)"
+              @tap="selectCoupon(null)"
+              data-testid="coupon-item-none"
+            >
+              <view class="coupon-item-main">
+                <text class="coupon-item-name">不使用优惠券</text>
+              </view>
+            </view>
+            <view
+              v-for="coupon in availableCoupons"
+              :key="coupon.id"
+              class="coupon-item"
+              :class="{ selected: selectedCouponId === coupon.id }"
+              @click="selectCoupon(coupon)"
+              @tap="selectCoupon(coupon)"
+              :data-testid="`coupon-item-${coupon.id}`"
+            >
+              <view class="coupon-item-main">
+                <text class="coupon-item-name">{{ coupon.template.name }}</text>
+                <text class="coupon-item-desc">{{ coupon.template.description }}</text>
+              </view>
+              <view class="coupon-item-amount">
+                <text class="coupon-item-value">-¥{{ coupon.template.discount_amount.toFixed(2) }}</text>
+                <text class="coupon-item-threshold">满{{ coupon.template.threshold_amount }}可用</text>
+              </view>
+            </view>
+            <view v-if="!availableCoupons.length && !loadingCoupons" class="coupon-empty">
+              <text>暂无可用优惠券</text>
+              <button class="primary small" @click="goToCouponCenter" @tap="goToCouponCenter">去领券中心</button>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+
       <p v-else class="muted" data-testid="checkout-merchant-missing">请先从商家页添加商品。</p>
     </view>
   </view>
@@ -115,9 +180,10 @@ import {
   validateCheckoutPayload,
   type CheckoutPayload,
   type Merchant,
-  type Product
+  type Product,
+  type UserCoupon
 } from '@community-store/shared';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import AppTopBar from '../../components/AppTopBar.vue';
 import { getDataSource } from '../../services/data-source';
@@ -125,7 +191,7 @@ import { formatMoney } from '../../services/format';
 import { useCartStore } from '../../stores/cart';
 import { useSessionStore } from '../../stores/session';
 import { showMessage } from '../../utils/ui';
-import { numberOption, redirectTo } from '../../utils/navigation';
+import { numberOption, redirectTo, navigateTo } from '../../utils/navigation';
 
 const dataSource = getDataSource();
 const cartStore = useCartStore();
@@ -135,6 +201,10 @@ const merchant = ref<Merchant | null>(null);
 const products = ref<Product[]>([]);
 const submitting = ref(false);
 const submitFeedback = ref('');
+const availableCoupons = ref<UserCoupon[]>([]);
+const selectedCouponId = ref<number | null>(null);
+const couponPickerVisible = ref(false);
+const loadingCoupons = ref(false);
 const form = reactive({
   receiver_name: '',
   receiver_phone: '',
@@ -175,11 +245,23 @@ const itemsAmount = computed(() =>
   cartItems.value.reduce((sum, item) => sum + item.subtotal, 0)
 );
 
+const selectedCoupon = computed(() => {
+  return availableCoupons.value.find((c) => c.id === selectedCouponId.value) ?? null;
+});
+
+const discountAmount = computed(() => {
+  if (!selectedCoupon.value) {
+    return 0;
+  }
+  return selectedCoupon.value.template.discount_amount;
+});
+
 const totalAmount = computed(() => {
   if (!merchant.value) {
     return itemsAmount.value;
   }
-  return itemsAmount.value + merchant.value.delivery_fee;
+  const total = itemsAmount.value + merchant.value.delivery_fee - discountAmount.value;
+  return Math.max(0, total);
 });
 
 async function loadData(): Promise<void> {
@@ -194,6 +276,55 @@ async function loadData(): Promise<void> {
   }
 
   products.value = await dataSource.listProducts(merchant.value.id);
+  await loadAvailableCoupons();
+}
+
+async function loadAvailableCoupons(): Promise<void> {
+  if (!merchant.value || !sessionStore.state.user?.id) {
+    return;
+  }
+  if (!itemsAmount.value) {
+    availableCoupons.value = [];
+    return;
+  }
+  try {
+    loadingCoupons.value = true;
+    availableCoupons.value = await dataSource.listAvailableCouponsForCart(
+      sessionStore.state.user.id,
+      merchant.value.id,
+      itemsAmount.value,
+      merchant.value.delivery_fee
+    );
+    if (selectedCouponId.value) {
+      const stillAvailable = availableCoupons.value.some(
+        (c) => c.id === selectedCouponId.value
+      );
+      if (!stillAvailable) {
+        selectedCouponId.value = null;
+      }
+    }
+  } catch (error) {
+    console.error('加载可用优惠券失败', error);
+  } finally {
+    loadingCoupons.value = false;
+  }
+}
+
+function openCouponPicker(): void {
+  couponPickerVisible.value = true;
+}
+
+function closeCouponPicker(): void {
+  couponPickerVisible.value = false;
+}
+
+function selectCoupon(coupon: UserCoupon | null): void {
+  selectedCouponId.value = coupon?.id ?? null;
+  couponPickerVisible.value = false;
+}
+
+function goToCouponCenter(): void {
+  navigateTo('pages/coupon/center');
 }
 
 async function adjust(product: Product, step: number): Promise<void> {
@@ -224,13 +355,14 @@ async function submitOrder(): Promise<void> {
   }
 
   try {
-    const payload: CheckoutPayload = {
+    const payload: CheckoutPayload & { coupon_id?: number } = {
       buyer_id: sessionStore.state.user.id,
       merchant_id: merchant.value.id,
       receiver_name: form.receiver_name,
       receiver_phone: form.receiver_phone,
       receiver_address: form.receiver_address,
-      remark: form.remark
+      remark: form.remark,
+      coupon_id: selectedCouponId.value ?? undefined
     };
 
     const payloadErrors = validateCheckoutPayload(payload);
@@ -263,6 +395,15 @@ async function submitOrder(): Promise<void> {
     submitting.value = false;
   }
 }
+
+watch(
+  () => itemsAmount.value,
+  () => {
+    if (merchant.value) {
+      loadAvailableCoupons();
+    }
+  }
+);
 
 onLoad((options) => {
   routeMerchantId.value = numberOption(options, 'merchantId', 0);

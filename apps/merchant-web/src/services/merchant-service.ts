@@ -4,6 +4,7 @@ import {
   seedProducts,
   seedUsers,
   STORAGE_KEYS,
+  type CouponRedeemRecord,
   type LoginPayload,
   type Merchant,
   type Order,
@@ -369,6 +370,22 @@ class MerchantService {
     target.updated_at = new Date().toISOString();
     writeOrders(orders);
     return target;
+  }
+
+  async listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]> {
+    if (this.config.dataMode === 'api') {
+      return request<CouponRedeemRecord[]>(
+        `/coupon/redeem-records?merchant_id=${merchantId}`
+      );
+    }
+
+    const records = readJSON<CouponRedeemRecord[]>(
+      STORAGE_KEYS.coupon_redeem_records,
+      []
+    );
+    return records
+      .filter((r) => r.merchant_id === merchantId)
+      .sort((a, b) => b.redeemed_at.localeCompare(a.redeemed_at));
   }
 }
 

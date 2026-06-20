@@ -5,6 +5,14 @@ from users.views import LoginView, RegisterMerchantView
 from merchants.views import MerchantListView, MerchantDetailView
 from products.views import ProductListView, ProductDetailView
 from orders.views import CartValidateView, OrderDetailView, OrderListView, OrderStatusUpdateView
+from coupons.views import (
+    AvailableCouponsView,
+    CouponClaimView,
+    CouponRedeemRecordListView,
+    CouponTemplateListView,
+    CouponValidateView,
+    UserCouponListView
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -17,5 +25,11 @@ urlpatterns = [
     path('api/v1/cart/validate', CartValidateView.as_view(), name='cart-validate'),
     path('api/v1/orders', OrderListView.as_view(), name='order-list'),
     path('api/v1/orders/<int:order_id>', OrderDetailView.as_view(), name='order-detail'),
-    path('api/v1/orders/<int:order_id>/status', OrderStatusUpdateView.as_view(), name='order-status')
+    path('api/v1/orders/<int:order_id>/status', OrderStatusUpdateView.as_view(), name='order-status'),
+    path('api/v1/coupon/templates', CouponTemplateListView.as_view(), name='coupon-template-list'),
+    path('api/v1/coupon/claim', CouponClaimView.as_view(), name='coupon-claim'),
+    path('api/v1/coupon/my', UserCouponListView.as_view(), name='user-coupon-list'),
+    path('api/v1/coupon/validate', CouponValidateView.as_view(), name='coupon-validate'),
+    path('api/v1/coupon/available', AvailableCouponsView.as_view(), name='coupon-available'),
+    path('api/v1/coupon/redeem-records', CouponRedeemRecordListView.as_view(), name='coupon-redeem-records')
 ]
