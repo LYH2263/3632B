@@ -2,17 +2,22 @@ import {
   canTransitionStatus,
   seedMerchants,
   seedProducts,
+  seedPromotions,
   seedUsers,
   STORAGE_KEYS,
   type AfterSale,
   type CouponRedeemRecord,
+  type CreatePromotionPayload,
   type LoginPayload,
   type Merchant,
   type Order,
   type OrderStatus,
   type Product,
-  type ProductReview,
+  type ProductPromotion,
+  type Promotion,
+  type PromotionStatus,
   type ReplyReviewPayload,
+  type UpdatePromotionPayload,
   type User
 } from '@community-store/shared';
 import { request } from './http';
@@ -82,6 +87,7 @@ function ensureMockStorage(): void {
     writeJSON(STORAGE_KEYS.merchants, seedMerchants);
     writeJSON(STORAGE_KEYS.products, seedProducts);
     writeJSON(STORAGE_KEYS.users, seedUsers);
+    writeJSON(STORAGE_KEYS.promotions, seedPromotions);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -103,6 +109,11 @@ function ensureMockStorage(): void {
   const orders = readJSON<Order[] | null>(STORAGE_KEYS.orders, null);
   if (!orders) {
     writeJSON(STORAGE_KEYS.orders, [] as Order[]);
+  }
+
+  const promotions = readJSON<Promotion[] | null>(STORAGE_KEYS.promotions, null);
+  if (!promotions) {
+    writeJSON(STORAGE_KEYS.promotions, seedPromotions);
   }
 }
 
@@ -131,6 +142,44 @@ function readOrders(): Order[] {
 
 function writeOrders(value: Order[]): void {
   writeJSON(STORAGE_KEYS.orders, value);
+}
+
+function readPromotions(): Promotion[] {
+  ensureMockStorage();
+  return readJSON(STORAGE_KEYS.promotions, seedPromotions);
+}
+
+function writePromotions(value: Promotion[]): void {
+  writeJSON(STORAGE_KEYS.promotions, value);
+}
+
+function getPromotionStatus(startAt: string, endAt: string, now: Date = new Date()): PromotionStatus {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (now < start) return 'draft';
+  if (now >= start && now <= end) return 'active';
+  return 'ended';
+}
+
+function getActivePromotionForProduct(productId: number, now: Date = new Date()): ProductPromotion | null {
+  const promotions = readPromotions();
+  for (const promotion of promotions) {
+    if (getPromotionStatus(promotion.start_at, promotion.end_at, now) !== 'active') continue;
+    const item = promotion.items.find((i) => i.product_id === productId);
+    if (item) {
+      const product = readProducts().find((p) => p.id === productId);
+      return {
+        promotion_id: promotion.id,
+        promotion_name: promotion.name,
+        promo_price: item.promo_price,
+        original_price: product?.price ?? item.original_price,
+        promo_stock: item.promo_stock,
+        start_at: promotion.start_at,
+        end_at: promotion.end_at
+      };
+    }
+  }
+  return null;
 }
 
 function readUsers(): User[] {
@@ -500,6 +549,148 @@ class MerchantService {
 
     writeJSON(STORAGE_KEYS.aftersales, aftersales);
     return aftersales[idx];
+  }
+
+  async listPromotions(merchantId: number, status?: PromotionStatus): Promise<Promotion[]> {
+    if (this.config.dataMode === 'api') {
+      const url = status
+        ? `/promotions?merchant_id=${merchantId}&status=${status}`
+        : `/promotions?merchant_id=${merchantId}`;
+      return request<Promotion[]>(url);
+    }
+
+    const now = new Date();
+    let promotions = readPromotions().filter((p) => p.merchant_id === merchantId);
+    promotions = promotions.map((p) => ({
+      ...p,
+      status: getPromotionStatus(p.start_at, p.end_at, now)
+    }));
+    if (status) {
+      promotions = promotions.filter((p) => p.status === status);
+    }
+    return promotions.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async getPromotion(promotionId: number): Promise<Promotion | null> {
+    if (this.config.dataMode === 'api') {
+      return request<Promotion | null>(`/promotions/${promotionId}`);
+    }
+
+    const promotion = readPromotions().find((p) => p.id === promotionId) ?? null;
+    if (promotion) {
+      return {
+        ...promotion,
+        status: getPromotionStatus(promotion.start_at, promotion.end_at)
+      };
+    }
+    return null;
+  }
+
+  async createPromotion(payload: CreatePromotionPayload): Promise<Promotion> {
+    if (this.config.dataMode === 'api') {
+      return request<Promotion>('/promotions', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const promotions = readPromotions();
+    const products = readProducts();
+    const now = new Date();
+
+    const newItems = payload.items.map((item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      return {
+        id: nextId(promotions.flatMap((p) => p.items)),
+        product_id: item.product_id,
+        product_name: product?.name ?? '',
+        original_price: product?.price ?? 0,
+        promo_price: item.promo_price,
+        promo_stock: item.promo_stock ?? -1,
+        sold_quantity: 0
+      };
+    });
+
+    const created: Promotion = {
+      id: nextId(promotions),
+      merchant_id: payload.merchant_id,
+      name: payload.name,
+      description: payload.description ?? '',
+      start_at: payload.start_at,
+      end_at: payload.end_at,
+      status: getPromotionStatus(payload.start_at, payload.end_at, now),
+      items: newItems,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    };
+
+    promotions.push(created);
+    writePromotions(promotions);
+    return created;
+  }
+
+  async updatePromotion(promotionId: number, payload: UpdatePromotionPayload): Promise<Promotion> {
+    if (this.config.dataMode === 'api') {
+      return request<Promotion>(`/promotions/${promotionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const promotions = readPromotions();
+    const products = readProducts();
+    const idx = promotions.findIndex((p) => p.id === promotionId);
+    if (idx === -1) {
+      throw new Error('活动不存在');
+    }
+
+    const now = new Date();
+    const updated = { ...promotions[idx], updated_at: now.toISOString() };
+
+    if (payload.name !== undefined) updated.name = payload.name;
+    if (payload.description !== undefined) updated.description = payload.description;
+    if (payload.start_at !== undefined) updated.start_at = payload.start_at;
+    if (payload.end_at !== undefined) updated.end_at = payload.end_at;
+    if (payload.items !== undefined) {
+      updated.items = payload.items.map((item) => {
+        const product = products.find((p) => p.id === item.product_id);
+        return {
+          id: nextId(promotions.flatMap((p) => p.items)),
+          product_id: item.product_id,
+          product_name: product?.name ?? '',
+          original_price: product?.price ?? 0,
+          promo_price: item.promo_price,
+          promo_stock: item.promo_stock ?? -1,
+          sold_quantity: 0
+        };
+      });
+    }
+
+    updated.status = getPromotionStatus(updated.start_at, updated.end_at, now);
+    promotions[idx] = updated;
+    writePromotions(promotions);
+    return updated;
+  }
+
+  async deletePromotion(promotionId: number): Promise<void> {
+    if (this.config.dataMode === 'api') {
+      await request(`/promotions/${promotionId}`, {
+        method: 'DELETE'
+      });
+      return;
+    }
+
+    const promotions = readPromotions();
+    const filtered = promotions.filter((p) => p.id !== promotionId);
+    writePromotions(filtered);
+  }
+
+  async getProductPromotion(productId: number): Promise<ProductPromotion | null> {
+    if (this.config.dataMode === 'api') {
+      return request<ProductPromotion | null>(`/products/${productId}/promotion`);
+    }
+
+    return getActivePromotionForProduct(productId);
   }
 }
 

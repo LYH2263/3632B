@@ -36,12 +36,25 @@
               :data-testid="`shop-product-image-${product.id}`"
             />
             <div class="product-card-info">
-              <h3 class="product-card-title" :data-testid="`shop-product-name-${product.id}`">{{ product.name }}</h3>
+              <h3 class="product-card-title" :data-testid="`shop-product-name-${product.id}`">
+                {{ product.name }}
+                <text v-if="product.promotion" class="promotion-tag">限时特价</text>
+              </h3>
               <p class="muted product-desc">{{ product.description || '暂无描述' }}</p>
               <div class="product-card-price-row">
-                <div class="price">{{ formatMoney(product.price) }}<span class="unit">/{{ product.unit }}</span></div>
+                <div>
+                  <text v-if="product.promotion" class="price promotion-price">
+                    {{ formatMoney(product.promotion.promo_price) }}<span class="unit">/{{ product.unit }}</span>
+                  </text>
+                  <text v-else class="price">
+                    {{ formatMoney(product.price) }}<span class="unit">/{{ product.unit }}</span>
+                  </text>
+                  <text v-if="product.promotion" class="original-price">
+                    ¥{{ formatMoney(product.promotion.original_price) }}
+                  </text>
+                </div>
                 <span class="muted stock-label" :data-testid="`shop-product-stock-${product.id}`">
-                  库存：{{ product.stock === -1 ? '不限' : product.stock }}
+                  库存：{{ product.promotion?.promo_stock === -1 ? '不限' : (product.promotion?.promo_stock ?? (product.stock === -1 ? '不限' : product.stock)) }}
                 </span>
               </div>
             </div>
@@ -81,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Merchant, Product } from '@community-store/shared';
+import { type Merchant, type Product, getEffectivePrice } from '@community-store/shared';
 import { computed, ref } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import AppTopBar from '../../components/AppTopBar.vue';
@@ -95,7 +108,7 @@ const cartStore = useCartStore();
 const dataSource = getDataSource();
 
 const merchant = ref<Merchant | null>(null);
-const products = ref<Product[]>([]);
+const products = ref<(Product & { promotion?: any })[]>([]);
 const keyword = ref('');
 const merchantId = ref(0);
 
@@ -119,7 +132,8 @@ const itemsAmount = computed(() => {
     if (!product) {
       return sum;
     }
-    return sum + product.price * item.quantity;
+    const effectivePrice = getEffectivePrice(product.price, product.promotion);
+    return sum + effectivePrice * item.quantity;
   }, 0);
 });
 
@@ -172,3 +186,27 @@ onLoad((options) => {
 
 onShow(loadData);
 </script>
+
+<style scoped>
+.promotion-tag {
+  display: inline-block;
+  background: #ff4d4f;
+  color: white;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.promotion-price {
+  color: #ff4d4f;
+}
+
+.original-price {
+  color: #999;
+  text-decoration: line-through;
+  margin-left: 8px;
+  font-size: 12px;
+}
+</style>

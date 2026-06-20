@@ -5,6 +5,7 @@ import {
   seedCouponTemplates,
   seedMerchants,
   seedProducts,
+  seedPromotions,
   seedUsers,
   type AfterSale,
   type Announcement,
@@ -14,13 +15,15 @@ import {
   type Merchant,
   type Order,
   type Product,
+  type ProductPromotion,
   type ProductReview,
+  type Promotion,
   type User,
   type UserCoupon
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 7;
+const MOCK_DB_VERSION = 8;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -44,6 +47,7 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.reviews, []);
     writeJSON(STORAGE_KEYS.aftersales, []);
     writeJSON(STORAGE_KEYS.announcements, seedAnnouncements);
+    writeJSON(STORAGE_KEYS.promotions, seedPromotions);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -61,6 +65,7 @@ export function ensureMockDB(): void {
   ensureSeed<ProductReview[]>(STORAGE_KEYS.reviews, []);
   ensureSeed<AfterSale[]>(STORAGE_KEYS.aftersales, []);
   ensureSeed<Announcement[]>(STORAGE_KEYS.announcements, seedAnnouncements);
+  ensureSeed<Promotion[]>(STORAGE_KEYS.promotions, seedPromotions);
 }
 
 export function readMerchants(): Merchant[] {
@@ -159,4 +164,43 @@ export function readAnnouncements(): Announcement[] {
 
 export function writeAnnouncements(value: Announcement[]): void {
   writeJSON(STORAGE_KEYS.announcements, value);
+}
+
+export function readPromotions(): Promotion[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.promotions, seedPromotions);
+}
+
+export function writePromotions(value: Promotion[]): void {
+  writeJSON(STORAGE_KEYS.promotions, value);
+}
+
+export function getActivePromotionForProduct(productId: number, now: Date = new Date()): ProductPromotion | null {
+  const promotions = readPromotions();
+  for (const promotion of promotions) {
+    const startAt = new Date(promotion.start_at);
+    const endAt = new Date(promotion.end_at);
+    if (now < startAt || now > endAt) continue;
+
+    const item = promotion.items.find((i) => i.product_id === productId);
+    if (item) {
+      const products = readProducts();
+      const product = products.find((p) => p.id === productId);
+      return {
+        promotion_id: promotion.id,
+        promotion_name: promotion.name,
+        promo_price: item.promo_price,
+        original_price: product?.price ?? item.original_price,
+        promo_stock: item.promo_stock,
+        start_at: promotion.start_at,
+        end_at: promotion.end_at
+      };
+    }
+  }
+  return null;
+}
+
+export function mergeProductWithPromotion<T extends Product>(product: T): T & { promotion?: ProductPromotion | null } {
+  const promotion = getActivePromotionForProduct(product.id);
+  return { ...product, promotion };
 }

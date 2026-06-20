@@ -1,4 +1,4 @@
-import type { Announcement, Cart, CouponTemplate, Merchant, Product, User } from './types';
+import type { Announcement, Cart, CouponTemplate, Merchant, Product, Promotion, User } from './types';
 
 export const seedUsers: User[] = [
   {
@@ -195,5 +195,53 @@ export const seedAnnouncements: Announcement[] = [
     valid_to: new Date(Date.now() + 86400000 * 30).toISOString(),
     is_pinned: false,
     created_at: new Date(Date.now() - 86400000).toISOString()
+  }
+];
+
+function getPromotionDateRange(): { from: string; to: string } {
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(now.getDate() - 1);
+  const to = new Date(now);
+  to.setDate(now.getDate() + 6);
+  return {
+    from: from.toISOString(),
+    to: to.toISOString()
+  };
+}
+
+const promotionDateRange = getPromotionDateRange();
+
+export const seedPromotions: Promotion[] = [
+  {
+    id: 1,
+    merchant_id: 1,
+    name: '限时特惠-鲜果尝鲜',
+    description: '新鲜水果限时特价，红富士苹果4.8元/斤，进口香蕉3.8元/斤，限时一周！',
+    start_at: promotionDateRange.from,
+    end_at: promotionDateRange.to,
+    status: 'active',
+    items: [
+      {
+        id: 1,
+        product_id: 1001,
+        product_name: '红富士苹果',
+        original_price: 6.8,
+        promo_price: 4.8,
+        promo_stock: 50,
+        sold_quantity: 0
+      },
+      {
+        id: 2,
+        product_id: 1002,
+        product_name: '进口香蕉',
+        original_price: 5.2,
+        promo_price: 3.8,
+        promo_stock: -1,
+        sold_quantity: 0
+      }
+    ],
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 86400000).toISOString()
   }
 ];

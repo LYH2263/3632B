@@ -11,6 +11,8 @@ from coupons.utils import validate_coupon_usage
 from membership.models import BuyerProfile
 from merchants.models import Merchant
 from products.models import Product
+from promotions.models import PromotionItem
+from promotions.utils import increment_sold_quantity
 from users.models import StoreUser
 from .models import Order
 from .serializers import (
@@ -36,14 +38,25 @@ def generate_order_no() -> str:
     return f"CS{now.strftime('%Y%m%d%H%M%S')}{randint(1000, 9999)}"
 
 
-def validate_cart(merchant: Merchant, cart_items: list[dict]) -> tuple[list[str], list[dict], Decimal]:
+def get_active_promotion_item(product_id: int, at_time=None) -> PromotionItem | None:
+    at_time = at_time or timezone.now()
+    return PromotionItem.objects.select_related('promotion', 'product').filter(
+        product_id=product_id,
+        promotion__start_at__lte=at_time,
+        promotion__end_at__gte=at_time,
+        promotion__status='active'
+    ).order_by('-promotion__created_at').first()
+
+
+def validate_cart(merchant: Merchant, cart_items: list[dict]) -> tuple[list[str], list[dict], Decimal, dict[int, PromotionItem]]:
     errors: list[str] = []
     snapshots: list[dict] = []
     items_amount = Decimal('0')
+    promotion_items_map: dict[int, PromotionItem] = {}
 
     if not cart_items:
         errors.append('购物车为空')
-        return errors, snapshots, items_amount
+        return errors, snapshots, items_amount, promotion_items_map
 
     for item in cart_items:
         product = Product.objects.filter(id=item['product_id'], merchant=merchant).first()
@@ -64,7 +77,24 @@ def validate_cart(merchant: Merchant, cart_items: list[dict]) -> tuple[list[str]
             errors.append(f"{product.name} 已下架")
             continue
 
-        subtotal = product.price * Decimal(quantity)
+        unit_price = product.price
+        promotion_id = None
+        promo_price = None
+        original_price = float(product.price)
+
+        promo_item = get_active_promotion_item(product.id)
+        if promo_item is not None:
+            if promo_item.promo_stock != -1:
+                remaining_promo_stock = promo_item.promo_stock - promo_item.sold_quantity
+                if quantity > remaining_promo_stock:
+                    errors.append(f"{product.name} 活动库存不足，剩余 {remaining_promo_stock} 件")
+                    continue
+            unit_price = promo_item.promo_price
+            promotion_id = promo_item.promotion_id
+            promo_price = float(promo_item.promo_price)
+            promotion_items_map[product.id] = promo_item
+
+        subtotal = unit_price * Decimal(quantity)
         items_amount += subtotal
 
         snapshots.append(
@@ -72,16 +102,19 @@ def validate_cart(merchant: Merchant, cart_items: list[dict]) -> tuple[list[str]
                 'product_id': product.id,
                 'name': product.name,
                 'unit': product.unit,
-                'price': float(product.price),
+                'price': float(unit_price),
                 'quantity': quantity,
-                'subtotal': float(subtotal)
+                'subtotal': float(subtotal),
+                'promotion_id': promotion_id,
+                'promo_price': promo_price,
+                'original_price': original_price
             }
         )
 
     if items_amount < merchant.min_order_amount:
         errors.append(f"未达到起送价：¥{merchant.min_order_amount:.2f}")
 
-    return errors, snapshots, items_amount
+    return errors, snapshots, items_amount, promotion_items_map
 
 
 def require_merchant_permission(request, merchant_id: int):
@@ -110,7 +143,7 @@ class CartValidateView(APIView):
 
         delivery_fee = merchant.pickup_fee if fulfillment_type == 'pickup' else merchant.delivery_fee
 
-        errors, snapshots, items_amount = validate_cart(
+        errors, snapshots, items_amount, _ = validate_cart(
             merchant,
             serializer.validated_data['cart_items']
         )
@@ -218,7 +251,7 @@ class OrderListView(APIView):
         if fulfillment_type == 'delivery' and not receiver_address:
             return error_response('配送订单收货地址必填', status_code=400)
 
-        errors, snapshots, items_amount = validate_cart(merchant, payload['cart_items'])
+        errors, snapshots, items_amount, promotion_items_map = validate_cart(merchant, payload['cart_items'])
         if errors:
             return error_response('下单失败', errors=errors)
 
@@ -290,6 +323,10 @@ class OrderListView(APIView):
             if product and product.stock != -1:
                 product.stock = product.stock - int(item['quantity'])
                 product.save(update_fields=['stock'])
+
+            promo_item = promotion_items_map.get(item['product_id'])
+            if promo_item is not None:
+                increment_sold_quantity(promo_item.id, int(item['quantity']))
 
         return success_response(OrderSerializer(order).data, status_code=201)
 

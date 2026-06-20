@@ -281,12 +281,88 @@ export interface PointLog {
   created_at: string;
 }
 
+export type PromotionStatus = 'draft' | 'active' | 'ended';
+
+export interface PromotionItem {
+  id: number;
+  product_id: number;
+  product_name: string;
+  original_price: number;
+  promo_price: number;
+  promo_stock: number;
+  sold_quantity: number;
+}
+
+export interface Promotion {
+  id: number;
+  merchant_id: number;
+  name: string;
+  description: string;
+  start_at: string;
+  end_at: string;
+  status: PromotionStatus;
+  items: PromotionItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductPromotion {
+  promotion_id: number;
+  promotion_name: string;
+  promo_price: number;
+  original_price: number;
+  promo_stock: number;
+  start_at: string;
+  end_at: string;
+}
+
+export interface ProductWithPromotion extends Product {
+  promotion?: ProductPromotion | null;
+}
+
+export interface OrderSnapshotItem {
+  product_id: number;
+  name: string;
+  unit: string;
+  price: number;
+  quantity: number;
+  subtotal: number;
+  promotion_id?: number | null;
+  promo_price?: number | null;
+  original_price?: number | null;
+}
+
+export interface CreatePromotionPayload {
+  merchant_id: number;
+  name: string;
+  description?: string;
+  start_at: string;
+  end_at: string;
+  items: Array<{
+    product_id: number;
+    promo_price: number;
+    promo_stock?: number;
+  }>;
+}
+
+export interface UpdatePromotionPayload {
+  name?: string;
+  description?: string;
+  start_at?: string;
+  end_at?: string;
+  items?: Array<{
+    product_id: number;
+    promo_price: number;
+    promo_stock?: number;
+  }>;
+}
+
 export interface DataSource {
   listMerchants(): Promise<Merchant[]>;
   getMerchant(merchantId: number): Promise<Merchant | null>;
   updateMerchant(merchantId: number, payload: Partial<Merchant>): Promise<Merchant>;
-  listProducts(merchantId: number, keyword?: string): Promise<Product[]>;
-  getProduct(productId: number): Promise<Product | null>;
+  listProducts(merchantId: number, keyword?: string): Promise<ProductWithPromotion[]>;
+  getProduct(productId: number): Promise<ProductWithPromotion | null>;
   createProduct(payload: Omit<Product, 'id'>): Promise<Product>;
   updateProduct(productId: number, payload: Partial<Product>): Promise<Product>;
   listOrdersByBuyer(buyerId: number): Promise<Order[]>;
@@ -331,4 +407,11 @@ export interface DataSource {
 
   getBuyerProfile(): Promise<BuyerProfile>;
   listPointLogs(): Promise<PointLog[]>;
+
+  listPromotions(merchantId: number, status?: PromotionStatus): Promise<Promotion[]>;
+  getPromotion(promotionId: number): Promise<Promotion | null>;
+  createPromotion(payload: CreatePromotionPayload): Promise<Promotion>;
+  updatePromotion(promotionId: number, payload: UpdatePromotionPayload): Promise<Promotion>;
+  deletePromotion(promotionId: number): Promise<void>;
+  getProductPromotion(productId: number): Promise<ProductPromotion | null>;
 }

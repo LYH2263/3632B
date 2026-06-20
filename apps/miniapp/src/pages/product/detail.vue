@@ -12,11 +12,32 @@
             data-testid="product-image"
           />
           <div class="product-detail-body">
-            <h2 class="product-detail-title" data-testid="product-name">{{ product.name }}</h2>
+            <h2 class="product-detail-title" data-testid="product-name">
+              {{ product.name }}
+              <text v-if="product.promotion" class="promotion-tag">限时特价</text>
+            </h2>
             <div class="product-detail-price-row">
-              <p class="price" data-testid="product-price">{{ formatMoney(product.price) }}<span class="unit">/{{ product.unit }}</span></p>
-              <p class="muted stock-label" data-testid="product-stock">库存：{{ product.stock === -1 ? '不限' : product.stock }}</p>
+              <div>
+                <text v-if="product.promotion" class="price promotion-price" data-testid="product-price">
+                  {{ formatMoney(product.promotion.promo_price) }}<span class="unit">/{{ product.unit }}</span>
+                </text>
+                <text v-else class="price" data-testid="product-price">
+                  {{ formatMoney(product.price) }}<span class="unit">/{{ product.unit }}</span>
+                </text>
+                <text v-if="product.promotion" class="original-price">
+                  ¥{{ formatMoney(product.promotion.original_price) }}
+                </text>
+              </div>
+              <p class="muted stock-label" data-testid="product-stock">
+                库存：{{ product.promotion?.promo_stock === -1 ? '不限' : (product.promotion?.promo_stock ?? (product.stock === -1 ? '不限' : product.stock)) }}
+              </p>
             </div>
+
+            <view v-if="product.promotion" class="promotion-info-box">
+              <text class="promotion-info-title">{{ product.promotion.promotion_name }}</text>
+              <text class="promotion-info-time">⏰ {{ formatPromotionTimeRange(product.promotion.start_at, product.promotion.end_at) }}</text>
+            </view>
+
             <p class="muted product-detail-desc" data-testid="product-description">{{ product.description || '暂无描述' }}</p>
 
             <div class="product-detail-quantity">
@@ -143,7 +164,8 @@ import {
   type Merchant,
   type Product,
   type ProductReview,
-  type ProductReviewSummary
+  type ProductReviewSummary,
+  formatPromotionTimeRange
 } from '@community-store/shared';
 import { computed, ref } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
@@ -157,7 +179,7 @@ import { numberOption, redirectTo } from '../../utils/navigation';
 const cartStore = useCartStore();
 const dataSource = getDataSource();
 
-const product = ref<Product | null>(null);
+const product = ref<(Product & { promotion?: any }) | null>(null);
 const merchant = ref<Merchant | null>(null);
 const quantity = ref(1);
 const defaultProductImage = '/static/images/products/default.jpg';
@@ -184,9 +206,13 @@ function changeQuantity(step: number): void {
   if (next <= 0) {
     return;
   }
-  if (product.value && product.value.stock !== -1 && next > product.value.stock) {
-    showMessage('超过库存上限');
-    return;
+  if (product.value) {
+    const promoStock = product.value.promotion?.promo_stock;
+    const stock = promoStock === -1 ? product.value.stock : (promoStock ?? product.value.stock);
+    if (stock !== -1 && next > stock) {
+      showMessage('超过库存上限');
+      return;
+    }
   }
   quantity.value = next;
 }
@@ -255,3 +281,49 @@ onShow(async () => {
   await loadReviews();
 });
 </script>
+
+<style scoped>
+.promotion-tag {
+  display: inline-block;
+  background: #ff4d4f;
+  color: white;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.promotion-price {
+  color: #ff4d4f;
+}
+
+.original-price {
+  color: #999;
+  text-decoration: line-through;
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.promotion-info-box {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.promotion-info-title {
+  color: #d46b08;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.promotion-info-time {
+  color: #d46b08;
+  font-size: 12px;
+}
+</style>

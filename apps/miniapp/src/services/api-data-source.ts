@@ -9,6 +9,7 @@ import {
   type CouponTemplate,
   type CouponValidationResult,
   type CreateAfterSalePayload,
+  type CreatePromotionPayload,
   type CreateReviewPayload,
   type DataSource,
   type LoginPayload,
@@ -18,9 +19,13 @@ import {
   type OrderStatus,
   type PointLog,
   type Product,
+  type ProductPromotion,
   type ProductReview,
   type ProductReviewSummary,
+  type Promotion,
+  type PromotionStatus,
   type ReplyReviewPayload,
+  type UpdatePromotionPayload,
   type UserCoupon,
   type CouponStatus
 } from '@community-store/shared';
@@ -271,5 +276,40 @@ export class ApiDataSource implements DataSource {
 
   async listPointLogs(): Promise<PointLog[]> {
     return request<PointLog[]>('/membership/point-logs');
+  }
+
+  async listPromotions(merchantId: number, status?: PromotionStatus): Promise<Promotion[]> {
+    const params = new URLSearchParams();
+    params.set('merchant_id', String(merchantId));
+    if (status) params.set('status', status);
+    return request<Promotion[]>(`/promotions?${params.toString()}`);
+  }
+
+  async getPromotion(promotionId: number): Promise<Promotion | null> {
+    return request<Promotion | null>(`/promotions/${promotionId}`);
+  }
+
+  async createPromotion(payload: CreatePromotionPayload): Promise<Promotion> {
+    return request<Promotion>('/promotions', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async updatePromotion(promotionId: number, payload: UpdatePromotionPayload): Promise<Promotion> {
+    return request<Promotion>(`/promotions/${promotionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async deletePromotion(promotionId: number): Promise<void> {
+    await request<void>(`/promotions/${promotionId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getProductPromotion(productId: number): Promise<ProductPromotion | null> {
+    return request<ProductPromotion | null>(`/products/${productId}/promotion`);
   }
 }

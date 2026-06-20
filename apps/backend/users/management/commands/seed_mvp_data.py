@@ -6,6 +6,7 @@ from django.utils import timezone
 from coupons.models import CouponTemplate
 from merchants.models import Merchant
 from products.models import Product
+from promotions.models import Promotion, PromotionItem
 from users.models import StoreUser
 
 
@@ -181,5 +182,44 @@ class Command(BaseCommand):
                 'merchant': merchant_b
             }
         )
+
+        now = timezone.now()
+        promotion_start = now - timedelta(days=1)
+        promotion_end = now + timedelta(days=6)
+
+        promotion, created = Promotion.objects.get_or_create(
+            name='限时特惠-鲜果尝鲜',
+            merchant=merchant_a,
+            defaults={
+                'description': '新鲜水果限时特价，红富士苹果4.8元/斤，进口香蕉3.8元/斤，限时一周！',
+                'start_at': promotion_start,
+                'end_at': promotion_end,
+                'status': 'active'
+            }
+        )
+
+        if created:
+            apple = Product.objects.get(merchant=merchant_a, name='红富士苹果')
+            banana = Product.objects.get(merchant=merchant_a, name='进口香蕉')
+
+            PromotionItem.objects.get_or_create(
+                promotion=promotion,
+                product=apple,
+                defaults={
+                    'promo_price': 4.8,
+                    'promo_stock': 50,
+                    'sold_quantity': 0
+                }
+            )
+
+            PromotionItem.objects.get_or_create(
+                promotion=promotion,
+                product=banana,
+                defaults={
+                    'promo_price': 3.8,
+                    'promo_stock': -1,
+                    'sold_quantity': 0
+                }
+            )
 
         self.stdout.write(self.style.SUCCESS('MVP 示例数据初始化完成'))

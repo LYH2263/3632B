@@ -110,6 +110,60 @@
       </div>
     </el-card>
 
+    <el-card class="block" ref="promotionSection" data-testid="web-promotion-card">
+      <template #header>
+        <div class="block-header">
+          <div class="block-title" data-testid="web-promotion-card-title">促销管理</div>
+          <el-button type="primary" data-testid="web-promotion-open-create" @click="openCreatePromotionDialog">新增活动</el-button>
+        </div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="promotions" stripe data-testid="web-promotion-table">
+        <el-table-column prop="name" label="活动名称" min-width="160" />
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="promotionStatusType(scope.row.status)" size="small">
+              {{ getPromotionStatusText(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="活动时间" min-width="320">
+          <template #default="scope">{{ formatPromotionTimeRange(scope.row) }}</template>
+        </el-table-column>
+        <el-table-column label="商品数量" width="100">
+          <template #default="scope">{{ scope.row.items.length }}</template>
+        </el-table-column>
+        <el-table-column prop="description" label="描述" min-width="180" show-overflow-tooltip />
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="scope">
+            <el-space>
+              <el-button
+                size="small"
+                :data-testid="`web-promotion-edit-${scope.row.id}`"
+                @click="openEditPromotionDialog(scope.row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                :data-testid="`web-promotion-delete-${scope.row.id}`"
+                @click="deletePromotion(scope.row.id)"
+              >
+                删除
+              </el-button>
+            </el-space>
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!promotions.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无促销活动
+      </div>
+    </el-card>
+
     <el-card class="block" ref="orderSection" data-testid="web-order-card">
       <template #header>
         <div class="block-title" data-testid="web-order-card-title">订单管理</div>
@@ -259,6 +313,106 @@
         暂无评价
       </div>
     </el-card>
+
+    <el-dialog
+      v-model="promotionDialogVisible"
+      :title="editingPromotionId ? '编辑促销活动' : '新增促销活动'"
+      width="720px"
+      data-testid="web-promotion-dialog"
+    >
+      <el-form :model="promotionForm" label-width="90px" data-testid="web-promotion-form">
+        <el-form-item label="活动名称">
+          <el-input v-model="promotionForm.name" data-testid="web-promotion-name" maxlength="120" show-word-limit />
+        </el-form-item>
+        <el-form-item label="活动描述">
+          <el-input v-model="promotionForm.description" data-testid="web-promotion-description" type="textarea" :rows="2" maxlength="255" show-word-limit />
+        </el-form-item>
+        <el-form-item label="开始时间">
+          <el-date-picker
+            v-model="promotionForm.start_at"
+            type="datetime"
+            placeholder="选择开始时间"
+            data-testid="web-promotion-start"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间">
+          <el-date-picker
+            v-model="promotionForm.end_at"
+            type="datetime"
+            placeholder="选择结束时间"
+            data-testid="web-promotion-end"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="选择商品">
+          <el-select
+            v-model="selectedProductIds"
+            multiple
+            placeholder="请选择参与活动的商品"
+            data-testid="web-promotion-products"
+            style="width: 100%;"
+            @change="onProductSelectionChange"
+          >
+            <el-option
+              v-for="product in products.filter(p => p.is_active)"
+              :key="product.id"
+              :label="`${product.name} (原价: ¥${product.price.toFixed(2)}/${product.unit})`"
+              :value="product.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="promotionForm.items.length > 0" label="活动价格">
+          <div style="width: 100%;">
+            <el-table :data="promotionForm.items" border size="small">
+              <el-table-column prop="product_id" label="商品ID" width="80" />
+              <el-table-column label="商品名称" min-width="140">
+                <template #default="scope">
+                  {{ getProductName(scope.row.product_id) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="原价" width="100">
+                <template #default="scope">
+                  ¥{{ getProductPrice(scope.row.product_id).toFixed(2) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="活动价" width="160">
+                <template #default="scope">
+                  <el-input-number
+                    v-model="scope.row.promo_price"
+                    :min="0.01"
+                    :step="0.1"
+                    :precision="2"
+                    size="small"
+                    :data-testid="`web-promotion-item-price-${scope.row.product_id}`"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="活动库存" width="160">
+                <template #default="scope">
+                  <el-input-number
+                    v-model="scope.row.promo_stock"
+                    :min="-1"
+                    :step="1"
+                    size="small"
+                    :data-testid="`web-promotion-item-stock-${scope.row.product_id}`"
+                  />
+                  <span style="color: #909399; font-size: 12px;">-1 表示不限</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button data-testid="web-promotion-cancel" @click="promotionDialogVisible = false">取消</el-button>
+        <el-button type="primary" data-testid="web-promotion-save" @click="savePromotion">保存</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="productDialogVisible"
@@ -464,16 +618,21 @@ import {
   AFTERSALE_REJECT_REASON_LABELS,
   AFTERSALE_STATUS_LABELS,
   FULFILLMENT_TYPE_LABELS,
+  formatPromotionTimeRange,
+  getPromotionStatusText,
   ORDER_STATUS_LABELS,
   STATUS_TRANSITIONS,
   type AfterSale,
   type CouponRedeemRecord,
+  type CreatePromotionPayload,
   type FulfillmentType,
   type Merchant,
   type Order,
   type OrderStatus,
   type Product,
   type ProductReview,
+  type Promotion,
+  type PromotionStatus,
   type User
 } from '@community-store/shared';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -490,6 +649,7 @@ const orders = ref<Order[]>([]);
 const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
 const reviews = ref<ProductReview[]>([]);
 const aftersales = ref<AfterSale[]>([]);
+const promotions = ref<Promotion[]>([]);
 
 const merchantForm = reactive({
   phone: '',
@@ -523,6 +683,19 @@ const productForm = reactive({
   description: ''
 });
 
+const promotionDialogVisible = ref(false);
+const editingPromotionId = ref<number | null>(null);
+const promotionForm = reactive({
+  name: '',
+  description: '',
+  start_at: '',
+  end_at: '',
+  items: [] as Array<{ product_id: number; promo_price: number; promo_stock: number }>
+});
+const selectedProductIds = ref<number[]>([]);
+
+const promotionSection = ref<{ $el: HTMLElement } | null>(null);
+
 const merchantSection = ref<{ $el: HTMLElement } | null>(null);
 const productSection = ref<{ $el: HTMLElement } | null>(null);
 const orderSection = ref<{ $el: HTMLElement } | null>(null);
@@ -534,6 +707,7 @@ const activeSection = ref('merchant');
 const sections = [
   { key: 'merchant', label: '店铺信息' },
   { key: 'product', label: '商品管理' },
+  { key: 'promotion', label: '促销管理' },
   { key: 'order', label: '订单管理' },
   { key: 'coupon', label: '核销记录' },
   { key: 'review', label: '评价管理' },
@@ -543,6 +717,7 @@ const sections = [
 const sectionRefs: Record<string, typeof merchantSection> = {
   merchant: merchantSection,
   product: productSection,
+  promotion: promotionSection,
   order: orderSection,
   coupon: couponSection,
   review: reviewSection,
@@ -628,6 +803,7 @@ async function loadData(): Promise<void> {
   couponRedeemRecords.value = await merchantService.listCouponRedeemRecords(merchantId.value);
   reviews.value = await merchantService.listReviews(merchantId.value);
   aftersales.value = await merchantService.listAfterSales(merchantId.value);
+  promotions.value = await merchantService.listPromotions(merchantId.value);
 }
 
 async function saveMerchant(): Promise<void> {
@@ -805,6 +981,137 @@ async function submitReject(): Promise<void> {
     rejectingAfterSaleId.value = null;
     rejectReason.value = '';
     rejectRemark.value = '';
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+function promotionStatusType(status: PromotionStatus): 'success' | 'warning' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'info'> = {
+    active: 'success',
+    draft: 'warning',
+    ended: 'info'
+  };
+  return map[status] ?? 'info';
+}
+
+function getProductName(productId: number): string {
+  const product = products.value.find((p) => p.id === productId);
+  return product?.name ?? '';
+}
+
+function getProductPrice(productId: number): number {
+  const product = products.value.find((p) => p.id === productId);
+  return product?.price ?? 0;
+}
+
+function resetPromotionForm(): void {
+  editingPromotionId.value = null;
+  promotionForm.name = '';
+  promotionForm.description = '';
+  promotionForm.start_at = '';
+  promotionForm.end_at = '';
+  promotionForm.items = [];
+  selectedProductIds.value = [];
+}
+
+function onProductSelectionChange(): void {
+  const existingIds = promotionForm.items.map((item) => item.product_id);
+  const toRemove = existingIds.filter((id) => !selectedProductIds.value.includes(id));
+  const toAdd = selectedProductIds.value.filter((id) => !existingIds.includes(id));
+
+  promotionForm.items = promotionForm.items.filter((item) => !toRemove.includes(item.product_id));
+
+  for (const productId of toAdd) {
+    const product = products.value.find((p) => p.id === productId);
+    promotionForm.items.push({
+      product_id: productId,
+      promo_price: product ? Number((product.price * 0.8).toFixed(2)) : 0,
+      promo_stock: -1
+    });
+  }
+}
+
+function openCreatePromotionDialog(): void {
+  resetPromotionForm();
+  promotionDialogVisible.value = true;
+}
+
+function openEditPromotionDialog(promotion: Promotion): void {
+  resetPromotionForm();
+  editingPromotionId.value = promotion.id;
+  promotionForm.name = promotion.name;
+  promotionForm.description = promotion.description;
+  promotionForm.start_at = promotion.start_at;
+  promotionForm.end_at = promotion.end_at;
+  promotionForm.items = promotion.items.map((item) => ({
+    product_id: item.product_id,
+    promo_price: item.promo_price,
+    promo_stock: item.promo_stock
+  }));
+  selectedProductIds.value = promotion.items.map((item) => item.product_id);
+  promotionDialogVisible.value = true;
+}
+
+async function savePromotion(): Promise<void> {
+  if (!merchantId.value) return;
+  if (!promotionForm.name.trim()) {
+    ElMessage.error('活动名称不能为空');
+    return;
+  }
+  if (!promotionForm.start_at || !promotionForm.end_at) {
+    ElMessage.error('请选择活动时间');
+    return;
+  }
+  if (new Date(promotionForm.start_at) >= new Date(promotionForm.end_at)) {
+    ElMessage.error('开始时间必须早于结束时间');
+    return;
+  }
+  if (promotionForm.items.length === 0) {
+    ElMessage.error('请至少选择一个商品');
+    return;
+  }
+  for (const item of promotionForm.items) {
+    if (item.promo_price <= 0) {
+      ElMessage.error(`商品 ${getProductName(item.product_id)} 的活动价必须大于0`);
+      return;
+    }
+  }
+
+  const payload: CreatePromotionPayload = {
+    merchant_id: merchantId.value,
+    name: promotionForm.name.trim(),
+    description: promotionForm.description.trim(),
+    start_at: promotionForm.start_at,
+    end_at: promotionForm.end_at,
+    items: promotionForm.items.map((item) => ({
+      product_id: item.product_id,
+      promo_price: item.promo_price,
+      promo_stock: item.promo_stock
+    }))
+  };
+
+  try {
+    if (editingPromotionId.value) {
+      await merchantService.updatePromotion(editingPromotionId.value, payload);
+      ElMessage.success('活动已更新');
+    } else {
+      await merchantService.createPromotion(payload);
+      ElMessage.success('活动已创建');
+    }
+    promotionDialogVisible.value = false;
+    resetPromotionForm();
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function deletePromotion(promotionId: number): Promise<void> {
+  try {
+    await merchantService.deletePromotion(promotionId);
+    ElMessage.success('活动已删除');
     await loadData();
   } catch (error) {
     ElMessage.error((error as Error).message);

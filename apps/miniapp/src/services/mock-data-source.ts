@@ -13,6 +13,7 @@ import {
   type CouponTemplate,
   type CouponValidationResult,
   type CreateAfterSalePayload,
+  type CreatePromotionPayload,
   type CreateReviewPayload,
   type DataSource,
   type LoginPayload,
@@ -22,14 +23,20 @@ import {
   type OrderStatus,
   type PointLog,
   type Product,
+  type ProductPromotion,
   type ProductReview,
   type ProductReviewSummary,
+  type Promotion,
+  type PromotionStatus,
   type ReplyReviewPayload,
+  type UpdatePromotionPayload,
   type UserCoupon,
   type CouponStatus
 } from '@community-store/shared';
 import {
   ensureMockDB,
+  getActivePromotionForProduct,
+  mergeProductWithPromotion,
   readAfterSales,
   readAnnouncements,
   readCart,
@@ -38,6 +45,7 @@ import {
   readMerchants,
   readOrders,
   readProducts,
+  readPromotions,
   readReviews,
   readUserCoupons,
   readUsers,
@@ -47,6 +55,7 @@ import {
   writeCouponTemplates,
   writeMerchants,
   writeOrders,
+  writePromotions,
   writeReviews,
   writeUserCoupons,
   writeProducts
@@ -88,7 +97,7 @@ export class MockDataSource implements DataSource {
 
   async listProducts(merchantId: number, keyword?: string): Promise<Product[]> {
     const normalizedKeyword = keyword?.trim().toLowerCase() ?? '';
-    return readProducts().filter((product) => {
+    const products = readProducts().filter((product) => {
       if (product.merchant_id !== merchantId) {
         return false;
       }
@@ -97,10 +106,13 @@ export class MockDataSource implements DataSource {
       }
       return product.name.toLowerCase().includes(normalizedKeyword);
     });
+    return products.map(mergeProductWithPromotion);
   }
 
   async getProduct(productId: number): Promise<Product | null> {
-    return readProducts().find((item) => item.id === productId) ?? null;
+    const product = readProducts().find((item) => item.id === productId) ?? null;
+    if (!product) return null;
+    return mergeProductWithPromotion(product);
   }
 
   async createProduct(payload: Omit<Product, 'id'>): Promise<Product> {
@@ -680,5 +692,125 @@ export class MockDataSource implements DataSource {
       source_id: o.id,
       created_at: o.updated_at
     }));
+  }
+
+  async listPromotions(merchantId: number, status?: PromotionStatus): Promise<Promotion[]> {
+    const now = new Date();
+    let promotions = readPromotions().filter((p) => p.merchant_id === merchantId);
+    promotions = promotions.map((p) => {
+      const startAt = new Date(p.start_at);
+      const endAt = new Date(p.end_at);
+      let s: PromotionStatus = 'draft';
+      if (now >= startAt && now <= endAt) s = 'active';
+      else if (now > endAt) s = 'ended';
+      return { ...p, status: s };
+    });
+    if (status) {
+      promotions = promotions.filter((p) => p.status === status);
+    }
+    return promotions.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async getPromotion(promotionId: number): Promise<Promotion | null> {
+    const promotion = readPromotions().find((p) => p.id === promotionId) ?? null;
+    if (!promotion) return null;
+    const now = new Date();
+    const startAt = new Date(promotion.start_at);
+    const endAt = new Date(promotion.end_at);
+    let status: PromotionStatus = 'draft';
+    if (now >= startAt && now <= endAt) status = 'active';
+    else if (now > endAt) status = 'ended';
+    return { ...promotion, status };
+  }
+
+  async createPromotion(payload: CreatePromotionPayload): Promise<Promotion> {
+    const promotions = readPromotions();
+    const products = readProducts();
+    const now = new Date();
+    const startAt = new Date(payload.start_at);
+    const endAt = new Date(payload.end_at);
+    let status: PromotionStatus = 'draft';
+    if (now >= startAt && now <= endAt) status = 'active';
+    else if (now > endAt) status = 'ended';
+
+    const newItems = payload.items.map((item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      return {
+        id: promotions.flatMap((p) => p.items).length + 1,
+        product_id: item.product_id,
+        product_name: product?.name ?? '',
+        original_price: product?.price ?? 0,
+        promo_price: item.promo_price,
+        promo_stock: item.promo_stock ?? -1,
+        sold_quantity: 0
+      };
+    });
+
+    const created: Promotion = {
+      id: promotions.length ? Math.max(...promotions.map((p) => p.id)) + 1 : 1,
+      merchant_id: payload.merchant_id,
+      name: payload.name,
+      description: payload.description ?? '',
+      start_at: payload.start_at,
+      end_at: payload.end_at,
+      status,
+      items: newItems,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    };
+
+    promotions.push(created);
+    writePromotions(promotions);
+    return created;
+  }
+
+  async updatePromotion(promotionId: number, payload: UpdatePromotionPayload): Promise<Promotion> {
+    const promotions = readPromotions();
+    const products = readProducts();
+    const idx = promotions.findIndex((p) => p.id === promotionId);
+    if (idx === -1) throw new Error('活动不存在');
+
+    const now = new Date();
+    const updated = { ...promotions[idx], updated_at: now.toISOString() };
+
+    if (payload.name !== undefined) updated.name = payload.name;
+    if (payload.description !== undefined) updated.description = payload.description;
+    if (payload.start_at !== undefined) updated.start_at = payload.start_at;
+    if (payload.end_at !== undefined) updated.end_at = payload.end_at;
+    if (payload.items !== undefined) {
+      updated.items = payload.items.map((item) => {
+        const product = products.find((p) => p.id === item.product_id);
+        return {
+          id: promotions.flatMap((p) => p.items).length + 1,
+          product_id: item.product_id,
+          product_name: product?.name ?? '',
+          original_price: product?.price ?? 0,
+          promo_price: item.promo_price,
+          promo_stock: item.promo_stock ?? -1,
+          sold_quantity: 0
+        };
+      });
+    }
+
+    const startAt = new Date(updated.start_at);
+    const endAt = new Date(updated.end_at);
+    let status: PromotionStatus = 'draft';
+    if (now >= startAt && now <= endAt) status = 'active';
+    else if (now > endAt) status = 'ended';
+    updated.status = status;
+
+    promotions[idx] = updated;
+    writePromotions(promotions);
+    return updated;
+  }
+
+  async deletePromotion(promotionId: number): Promise<void> {
+    const promotions = readPromotions();
+    const filtered = promotions.filter((p) => p.id !== promotionId);
+    writePromotions(filtered);
+  }
+
+  async getProductPromotion(productId: number): Promise<ProductPromotion | null> {
+    return getActivePromotionForProduct(productId);
   }
 }

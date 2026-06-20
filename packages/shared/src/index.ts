@@ -5,5 +5,6 @@ export * from './utils/number';
 export * from './utils/order';
 export * from './utils/validator';
 export * from './utils/coupon';
+export * from './utils/promotion';
 
-export { seedAnnouncements } from './seed';
+export { seedAnnouncements, seedPromotions } from './seed';

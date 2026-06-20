@@ -27,10 +27,23 @@ class OrderStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['pending', 'confirmed', 'delivering', 'pickup_ready', 'completed', 'canceled', 'refunded'])
 
 
+class OrderSnapshotItemSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    name = serializers.CharField()
+    unit = serializers.CharField()
+    price = serializers.FloatField()
+    quantity = serializers.IntegerField()
+    subtotal = serializers.FloatField()
+    promotion_id = serializers.IntegerField(allow_null=True, required=False)
+    promo_price = serializers.FloatField(allow_null=True, required=False)
+    original_price = serializers.FloatField(allow_null=True, required=False)
+
+
 class OrderSerializer(serializers.ModelSerializer):
     buyer_id = serializers.IntegerField(source='buyer.id', read_only=True)
     merchant_id = serializers.IntegerField(source='merchant.id', read_only=True)
     coupon_id = serializers.IntegerField(source='coupon.id', read_only=True, allow_null=True)
+    items_snapshot = OrderSnapshotItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order

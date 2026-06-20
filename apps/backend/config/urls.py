@@ -22,6 +22,7 @@ from reviews.views import (
 from aftersales.views import AfterSaleCreateView, AfterSaleListView, AfterSaleReviewView
 from announcements.views import AnnouncementListView, AnnouncementDetailView
 from membership.views import BuyerProfileView, PointLogListView
+from promotions.views import PromotionListView, PromotionDetailView, ProductPromotionView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -51,5 +52,8 @@ urlpatterns = [
     path('api/v1/announcements', AnnouncementListView.as_view(), name='announcement-list'),
     path('api/v1/announcements/<int:announcement_id>', AnnouncementDetailView.as_view(), name='announcement-detail'),
     path('api/v1/membership/profile', BuyerProfileView.as_view(), name='membership-profile'),
-    path('api/v1/membership/point-logs', PointLogListView.as_view(), name='membership-point-logs')
+    path('api/v1/membership/point-logs', PointLogListView.as_view(), name='membership-point-logs'),
+    path('api/v1/promotions', PromotionListView.as_view(), name='promotion-list'),
+    path('api/v1/promotions/<int:promotion_id>', PromotionDetailView.as_view(), name='promotion-detail'),
+    path('api/v1/products/<int:product_id>/promotion', ProductPromotionView.as_view(), name='product-promotion')
 ]
