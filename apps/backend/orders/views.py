@@ -319,10 +319,15 @@ class OrderListView(APIView):
             )
 
         for item in payload['cart_items']:
-            product = Product.objects.filter(id=item['product_id'], merchant=merchant).first()
-            if product and product.stock != -1:
-                product.stock = product.stock - int(item['quantity'])
-                product.save(update_fields=['stock'])
+            product = Product.objects.select_for_update().filter(id=item['product_id'], merchant=merchant).first()
+            if product:
+                quantity = int(item['quantity'])
+                product.adjust_stock(
+                    change_quantity=-quantity,
+                    reason='order_deduct',
+                    operator=buyer,
+                    order=order
+                )
 
             promo_item = promotion_items_map.get(item['product_id'])
             if promo_item is not None:

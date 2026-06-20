@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Product
+from .models import Product, StockLedger
 from promotions.models import PromotionItem
 from promotions.serializers import ProductPromotionSerializer
 
@@ -50,3 +50,30 @@ class ProductSerializer(serializers.ModelSerializer):
             'start_at': promo_item.promotion.start_at,
             'end_at': promo_item.promotion.end_at
         }).data
+
+
+class StockLedgerSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source='product.id', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    reason_display = serializers.CharField(source='get_reason_display', read_only=True)
+    operator_id = serializers.IntegerField(source='operator.id', read_only=True)
+    operator_name = serializers.CharField(source='operator.nickname', read_only=True)
+    order_no = serializers.CharField(source='order.order_no', read_only=True, default=None)
+
+    class Meta:
+        model = StockLedger
+        fields = [
+            'id',
+            'product_id',
+            'product_name',
+            'change_quantity',
+            'stock_before',
+            'stock_after',
+            'reason',
+            'reason_display',
+            'operator_id',
+            'operator_name',
+            'order_id',
+            'order_no',
+            'operated_at',
+        ]
