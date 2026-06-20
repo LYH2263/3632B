@@ -10,6 +10,8 @@ import {
   type Order,
   type OrderStatus,
   type Product,
+  type ProductReview,
+  type ReplyReviewPayload,
   type User
 } from '@community-store/shared';
 import { request } from './http';
@@ -386,6 +388,42 @@ class MerchantService {
     return records
       .filter((r) => r.merchant_id === merchantId)
       .sort((a, b) => b.redeemed_at.localeCompare(a.redeemed_at));
+  }
+
+  async listReviews(merchantId: number): Promise<ProductReview[]> {
+    if (this.config.dataMode === 'api') {
+      return request<ProductReview[]>(`/reviews?merchant_id=${merchantId}`);
+    }
+
+    const reviews = readJSON<ProductReview[]>(STORAGE_KEYS.reviews, []);
+    return reviews
+      .filter((r) => r.merchant_id === merchantId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async replyReview(payload: ReplyReviewPayload): Promise<ProductReview> {
+    if (this.config.dataMode === 'api') {
+      return request<ProductReview>('/reviews/reply', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const reviews = readJSON<ProductReview[]>(STORAGE_KEYS.reviews, []);
+    const idx = reviews.findIndex((r) => r.id === payload.review_id);
+    if (idx === -1) {
+      throw new Error('评价不存在');
+    }
+    if (reviews[idx].reply && reviews[idx].reply!.trim()) {
+      throw new Error('已回复过，不可重复回复');
+    }
+    reviews[idx] = {
+      ...reviews[idx],
+      reply: payload.reply.trim(),
+      reply_at: new Date().toISOString()
+    };
+    writeJSON(STORAGE_KEYS.reviews, reviews);
+    return reviews[idx];
   }
 }
 

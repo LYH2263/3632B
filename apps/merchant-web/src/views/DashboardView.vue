@@ -177,6 +177,71 @@
       </div>
     </el-card>
 
+    <el-card class="block" ref="reviewSection" data-testid="web-review-card">
+      <template #header>
+        <div class="block-title" data-testid="web-review-card-title">评价管理</div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="reviews" stripe data-testid="web-review-table">
+        <el-table-column label="商品" min-width="160">
+          <template #default="scope">
+            <div>
+              <div>{{ scope.row.product_name || `商品 #${scope.row.product_id}` }}</div>
+              <div style="color: #909399; font-size: 12px;">订单号：{{ scope.row.order_no }}</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="buyer_nickname" label="买家" width="120" />
+        <el-table-column label="评分" width="120">
+          <template #default="scope">
+            <span :style="{ color: '#e6a23c', fontWeight: 600 }">
+              {{ '★'.repeat(scope.row.rating) }}{{ '☆'.repeat(5 - scope.row.rating) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="评价内容" min-width="240" show-overflow-tooltip>
+          <template #default="scope">
+            {{ scope.row.content || '（无文字评价）' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="商家回复" min-width="200" show-overflow-tooltip>
+          <template #default="scope">
+            <div v-if="scope.row.reply">
+              <div>{{ scope.row.reply }}</div>
+              <div style="color: #909399; font-size: 12px; margin-top: 4px;">
+                {{ formatReviewDate(scope.row.reply_at!) }}
+              </div>
+            </div>
+            <span v-else style="color: #909399;">未回复</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="评价时间" min-width="160">
+          <template #default="scope">
+            {{ formatReviewDate(scope.row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="scope">
+            <el-button
+              size="small"
+              type="primary"
+              :disabled="!!scope.row.reply"
+              :data-testid="`web-review-reply-${scope.row.id}`"
+              @click="openReplyDialog(scope.row.id)"
+            >
+              {{ scope.row.reply ? '已回复' : '回复' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!reviews.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无评价
+      </div>
+    </el-card>
+
     <el-dialog
       v-model="productDialogVisible"
       :title="editingProductId ? '编辑商品' : '新增商品'"
@@ -250,6 +315,31 @@
         <p><strong>总金额：{{ formatMoney(activeOrder.total_amount) }}</strong></p>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="replyDialogVisible"
+      title="回复评价"
+      width="560px"
+      data-testid="web-review-reply-dialog"
+    >
+      <el-form label-width="80px">
+        <el-form-item label="回复内容">
+          <el-input
+            v-model="replyContent"
+            type="textarea"
+            :rows="5"
+            maxlength="500"
+            show-word-limit
+            placeholder="请输入回复内容（500字内）"
+            data-testid="web-review-reply-content"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button data-testid="web-review-reply-cancel" @click="replyDialogVisible = false">取消</el-button>
+        <el-button type="primary" data-testid="web-review-reply-submit" @click="submitReply">提交回复</el-button>
+      </template>
+    </el-dialog>
   </div>
   </template>
   <div v-else class="dashboard-page" data-testid="web-dashboard-empty"></div>
@@ -264,6 +354,7 @@ import {
   type Order,
   type OrderStatus,
   type Product,
+  type ProductReview,
   type User
 } from '@community-store/shared';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -278,6 +369,7 @@ const merchant = ref<Merchant | null>(null);
 const products = ref<Product[]>([]);
 const orders = ref<Order[]>([]);
 const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
+const reviews = ref<ProductReview[]>([]);
 
 const merchantForm = reactive({
   phone: '',
@@ -292,6 +384,9 @@ const productDialogVisible = ref(false);
 const editingProductId = ref<number | null>(null);
 const orderDetailVisible = ref(false);
 const activeOrder = ref<Order | null>(null);
+const replyDialogVisible = ref(false);
+const replyingReviewId = ref<number | null>(null);
+const replyContent = ref('');
 const productForm = reactive({
   name: '',
   price: 0,
@@ -306,20 +401,23 @@ const merchantSection = ref<{ $el: HTMLElement } | null>(null);
 const productSection = ref<{ $el: HTMLElement } | null>(null);
 const orderSection = ref<{ $el: HTMLElement } | null>(null);
 const couponSection = ref<{ $el: HTMLElement } | null>(null);
+const reviewSection = ref<{ $el: HTMLElement } | null>(null);
 const activeSection = ref('merchant');
 
 const sections = [
   { key: 'merchant', label: '店铺信息' },
   { key: 'product', label: '商品管理' },
   { key: 'order', label: '订单管理' },
-  { key: 'coupon', label: '核销记录' }
+  { key: 'coupon', label: '核销记录' },
+  { key: 'review', label: '评价管理' }
 ];
 
 const sectionRefs: Record<string, typeof merchantSection> = {
   merchant: merchantSection,
   product: productSection,
   order: orderSection,
-  coupon: couponSection
+  coupon: couponSection,
+  review: reviewSection
 };
 
 const merchantId = computed(() => authUser.value?.merchant_id ?? 0);
@@ -380,6 +478,7 @@ async function loadData(): Promise<void> {
   products.value = await merchantService.listProducts(merchantId.value);
   orders.value = await merchantService.listOrdersByMerchant(merchantId.value);
   couponRedeemRecords.value = await merchantService.listCouponRedeemRecords(merchantId.value);
+  reviews.value = await merchantService.listReviews(merchantId.value);
 }
 
 async function saveMerchant(): Promise<void> {
@@ -468,6 +567,43 @@ async function updateOrderStatus(orderId: number, status: OrderStatus): Promise<
 function openOrderDetail(order: Order): void {
   activeOrder.value = order;
   orderDetailVisible.value = true;
+}
+
+function openReplyDialog(reviewId: number): void {
+  replyingReviewId.value = reviewId;
+  replyContent.value = '';
+  replyDialogVisible.value = true;
+}
+
+async function submitReply(): Promise<void> {
+  if (!replyingReviewId.value) return;
+  const content = replyContent.value.trim();
+  if (!content) {
+    ElMessage.error('回复内容不能为空');
+    return;
+  }
+  if (content.length > 500) {
+    ElMessage.error('回复内容不能超过 500 字');
+    return;
+  }
+  try {
+    await merchantService.replyReview({
+      review_id: replyingReviewId.value,
+      reply: content
+    });
+    ElMessage.success('回复成功');
+    replyDialogVisible.value = false;
+    replyingReviewId.value = null;
+    replyContent.value = '';
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+function formatReviewDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('zh-CN');
 }
 
 function logout(): void {

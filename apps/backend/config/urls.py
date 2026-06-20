@@ -13,6 +13,12 @@ from coupons.views import (
     CouponValidateView,
     UserCouponListView
 )
+from reviews.views import (
+    PendingReviewsView,
+    ReviewCreateView,
+    ReviewListView,
+    ReviewReplyView
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,5 +37,9 @@ urlpatterns = [
     path('api/v1/coupon/my', UserCouponListView.as_view(), name='user-coupon-list'),
     path('api/v1/coupon/validate', CouponValidateView.as_view(), name='coupon-validate'),
     path('api/v1/coupon/available', AvailableCouponsView.as_view(), name='coupon-available'),
-    path('api/v1/coupon/redeem-records', CouponRedeemRecordListView.as_view(), name='coupon-redeem-records')
+    path('api/v1/coupon/redeem-records', CouponRedeemRecordListView.as_view(), name='coupon-redeem-records'),
+    path('api/v1/reviews', ReviewListView.as_view(), name='review-list'),
+    path('api/v1/reviews/create', ReviewCreateView.as_view(), name='review-create'),
+    path('api/v1/reviews/reply', ReviewReplyView.as_view(), name='review-reply'),
+    path('api/v1/reviews/pending', PendingReviewsView.as_view(), name='review-pending')
 ]

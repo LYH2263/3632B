@@ -9,7 +9,8 @@ export const STORAGE_KEYS = {
   auth: 'community_store_auth',
   coupon_templates: 'community_store_coupon_templates',
   user_coupons: 'community_store_user_coupons',
-  coupon_redeem_records: 'community_store_coupon_redeem_records'
+  coupon_redeem_records: 'community_store_coupon_redeem_records',
+  reviews: 'community_store_reviews'
 } as const;
 
 export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {

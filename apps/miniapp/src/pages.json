@@ -43,6 +43,12 @@
       }
     },
     {
+      "path": "pages/review/create",
+      "style": {
+        "navigationBarTitleText": "发表评价"
+      }
+    },
+    {
       "path": "pages/coupon/center",
       "style": {
         "navigationBarTitleText": "领券中心"

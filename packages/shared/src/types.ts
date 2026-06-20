@@ -152,6 +152,46 @@ export interface CouponRedeemRecord {
   buyer_nickname: string;
 }
 
+export interface ProductReview {
+  id: number;
+  order_id: number;
+  product_id: number;
+  buyer_id: number;
+  merchant_id: number;
+  rating: number;
+  content: string;
+  reply?: string | null;
+  reply_at?: string | null;
+  created_at: string;
+  product_name?: string;
+  product_image_url?: string;
+  buyer_nickname?: string;
+  order_no?: string;
+}
+
+export interface ProductReviewSummary {
+  product_id: number;
+  average_rating: number;
+  review_count: number;
+  five_star_count: number;
+  four_star_count: number;
+  three_star_count: number;
+  two_star_count: number;
+  one_star_count: number;
+}
+
+export interface CreateReviewPayload {
+  order_id: number;
+  product_id: number;
+  rating: number;
+  content: string;
+}
+
+export interface ReplyReviewPayload {
+  review_id: number;
+  reply: string;
+}
+
 export interface LoginPayload {
   username: string;
   password: string;
@@ -196,4 +236,10 @@ export interface DataSource {
     deliveryFee: number
   ): Promise<UserCoupon[]>;
   listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]>;
+
+  createReview(payload: CreateReviewPayload): Promise<ProductReview>;
+  listReviewsByProduct(productId: number): Promise<{ reviews: ProductReview[]; summary: ProductReviewSummary }>;
+  listReviewsByMerchant(merchantId: number): Promise<ProductReview[]>;
+  replyReview(payload: ReplyReviewPayload): Promise<ProductReview>;
+  getPendingReviewsByOrder(orderId: number): Promise<{ product_id: number; name: string; image_url: string; unit: string; price: number; quantity: number }[]>;
 }

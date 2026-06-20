@@ -5,6 +5,7 @@ import {
   type CouponRedeemRecord,
   type CouponTemplate,
   type CouponValidationResult,
+  type CreateReviewPayload,
   type DataSource,
   type LoginPayload,
   type LoginResult,
@@ -12,6 +13,9 @@ import {
   type Order,
   type OrderStatus,
   type Product,
+  type ProductReview,
+  type ProductReviewSummary,
+  type ReplyReviewPayload,
   type UserCoupon,
   type CouponStatus
 } from '@community-store/shared';
@@ -195,5 +199,41 @@ export class ApiDataSource implements DataSource {
 
   async listCouponRedeemRecords(merchantId: number): Promise<CouponRedeemRecord[]> {
     return request<CouponRedeemRecord[]>(`/coupon/redeem-records?merchant_id=${merchantId}`);
+  }
+
+  async createReview(payload: CreateReviewPayload): Promise<ProductReview> {
+    return request<ProductReview>('/reviews/create', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async listReviewsByProduct(
+    productId: number
+  ): Promise<{ reviews: ProductReview[]; summary: ProductReviewSummary }> {
+    return request<{ reviews: ProductReview[]; summary: ProductReviewSummary }>(
+      `/reviews?product_id=${productId}`
+    );
+  }
+
+  async listReviewsByMerchant(merchantId: number): Promise<ProductReview[]> {
+    return request<ProductReview[]>(`/reviews?merchant_id=${merchantId}`);
+  }
+
+  async replyReview(payload: ReplyReviewPayload): Promise<ProductReview> {
+    return request<ProductReview>('/reviews/reply', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async getPendingReviewsByOrder(
+    orderId: number
+  ): Promise<
+    { product_id: number; name: string; image_url: string; unit: string; price: number; quantity: number }[]
+  > {
+    return request<
+      { product_id: number; name: string; image_url: string; unit: string; price: number; quantity: number }[]
+    >(`/reviews/pending?order_id=${orderId}`);
   }
 }

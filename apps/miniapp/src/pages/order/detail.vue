@@ -82,6 +82,16 @@
         <article class="card" v-if="showCancel" data-testid="order-detail-cancel-card">
           <button class="danger" data-testid="order-detail-cancel-btn" @click="cancelOrder">取消订单</button>
         </article>
+
+        <article class="card" v-if="showReview" data-testid="order-detail-review-card">
+          <button
+            class="primary"
+            data-testid="order-detail-review-btn"
+            @click="goToReview"
+          >
+            去评价
+          </button>
+        </article>
       </section>
       <p v-else class="muted" data-testid="order-detail-not-found">订单不存在。</p>
     </view>
@@ -100,7 +110,7 @@ import OrderStatusTag from '../../components/OrderStatusTag.vue';
 import { getDataSource } from '../../services/data-source';
 import { formatMoney } from '../../services/format';
 import { showMessage } from '../../utils/ui';
-import { numberOption } from '../../utils/navigation';
+import { navigateTo, numberOption } from '../../utils/navigation';
 
 const dataSource = getDataSource();
 const order = ref<Order | null>(null);
@@ -109,6 +119,10 @@ const orderId = ref(0);
 
 const showCancel = computed(
   () => order.value?.status === 'pending'
+);
+
+const showReview = computed(
+  () => order.value?.status === 'completed'
 );
 
 async function loadOrder(): Promise<void> {
@@ -132,6 +146,15 @@ async function cancelOrder(): Promise<void> {
     return;
   }
   await changeStatus('canceled');
+}
+
+function goToReview(): void {
+  if (!order.value) {
+    return;
+  }
+  navigateTo('pages/review/create', {
+    orderId: order.value.id
+  });
 }
 
 onLoad((options) => {
