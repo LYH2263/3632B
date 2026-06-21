@@ -93,11 +93,16 @@ export function validateCartForCheckout(
     errors.push(`未达到起送价：¥${merchant.min_order_amount.toFixed(2)}`);
   }
 
+  const deliveryFee = merchant.delivery_fee;
+  const discountAmount = 0;
+
   return {
     valid: errors.length === 0,
     errors,
     items_amount: itemsAmount,
-    total_amount: toMoney(itemsAmount + merchant.delivery_fee)
+    delivery_fee: deliveryFee,
+    discount_amount: discountAmount,
+    total_amount: toMoney(itemsAmount + deliveryFee - discountAmount)
   };
 }
 

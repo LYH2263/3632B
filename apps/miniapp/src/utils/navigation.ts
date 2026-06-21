@@ -28,6 +28,10 @@ export function redirectTo(path: string, query?: Record<string, QueryValue>): vo
   });
 }
 
+export function navigateBack(delta = 1): void {
+  uni.navigateBack({ delta });
+}
+
 export function numberOption(
   source: Record<string, unknown>,
   key: string,

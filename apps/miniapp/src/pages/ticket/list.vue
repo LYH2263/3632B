@@ -76,11 +76,12 @@ import {
 import { ref, computed, onMounted } from 'vue';
 import AppTopBar from '../../components/AppTopBar.vue';
 import { getDataSource } from '../../services/data-source';
-import { sessionStore } from '../../stores/session';
+import { useSessionStore } from '../../stores/session';
 import { showMessage } from '../../utils/ui';
 import { navigateTo } from '../../utils/navigation';
 
 const dataSource = getDataSource();
+const sessionStore = useSessionStore();
 
 const tickets = ref<TicketListItem[]>([]);
 const loading = ref(false);
@@ -129,7 +130,7 @@ async function loadTickets(): Promise<void> {
       loadingMore.value = true;
     }
 
-    const buyer = sessionStore.user;
+    const buyer = sessionStore.state.user;
     if (!buyer) {
       showMessage('请先登录');
       return;

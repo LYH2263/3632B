@@ -54,7 +54,15 @@
           </p>
         </article>
 
-        <article class="card coupon-card" data-testid="checkout-coupon-card" @click="openCouponPicker" @tap="openCouponPicker">
+        <p v-else class="muted" data-testid="checkout-cart-empty">购物车为空。</p>
+
+        <article
+          v-if="cartItems.length"
+          class="card coupon-card"
+          data-testid="checkout-coupon-card"
+          @click="openCouponPicker"
+          @tap="openCouponPicker"
+        >
           <view class="coupon-card-header">
             <span class="coupon-icon">🎫</span>
             <span class="coupon-label">优惠券</span>
@@ -72,8 +80,6 @@
             <span class="coupon-arrow">›</span>
           </view>
         </article>
-
-        <p v-else class="muted" data-testid="checkout-cart-empty">购物车为空。</p>
 
         <article class="card fulfillment-card" v-if="merchant && merchant.supports_pickup" data-testid="checkout-fulfillment-card">
           <h3>履约方式</h3>

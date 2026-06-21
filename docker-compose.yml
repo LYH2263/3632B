@@ -17,10 +17,11 @@ services:
     ports:
       - '3306:3306'
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-p${MYSQL_ROOT_PASSWORD:-root_pass}']
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${MYSQL_ROOT_PASSWORD:-root_pass}']
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 120s
     volumes:
       - mysql_data:/var/lib/mysql
 

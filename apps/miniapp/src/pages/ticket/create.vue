@@ -107,11 +107,12 @@ import {
 import { ref, computed, onMounted } from 'vue';
 import AppTopBar from '../../components/AppTopBar.vue';
 import { getDataSource } from '../../services/data-source';
-import { sessionStore } from '../../stores/session';
+import { useSessionStore } from '../../stores/session';
 import { showMessage } from '../../utils/ui';
 import { navigateBack } from '../../utils/navigation';
 
 const dataSource = getDataSource();
+const sessionStore = useSessionStore();
 
 const formData = ref<CreateTicketPayload>({
   merchant_id: 0,
@@ -179,8 +180,8 @@ async function loadData(): Promise<void> {
   try {
     const [merchantList, orderList] = await Promise.all([
       dataSource.listMerchants(),
-      sessionStore.user
-        ? dataSource.listOrdersByBuyer(sessionStore.user.id)
+      sessionStore.state.user
+        ? dataSource.listOrdersByBuyer(sessionStore.state.user.id)
         : Promise.resolve([])
     ]);
     merchants.value = merchantList;

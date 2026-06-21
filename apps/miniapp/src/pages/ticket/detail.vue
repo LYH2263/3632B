@@ -110,7 +110,6 @@ import {
 import { ref, onMounted } from 'vue';
 import AppTopBar from '../../components/AppTopBar.vue';
 import { getDataSource } from '../../services/data-source';
-import { sessionStore } from '../../stores/session';
 import { showMessage } from '../../utils/ui';
 
 const dataSource = getDataSource();
