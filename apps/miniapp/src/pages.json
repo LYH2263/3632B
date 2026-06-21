@@ -79,6 +79,12 @@
       }
     },
     {
+      "path": "pages/wallet/index",
+      "style": {
+        "navigationBarTitleText": "我的钱包"
+      }
+    },
+    {
       "path": "pages/ticket/list",
       "style": {
         "navigationBarTitleText": "我的客服"

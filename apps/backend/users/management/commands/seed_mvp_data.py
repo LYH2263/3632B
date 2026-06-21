@@ -10,6 +10,7 @@ from merchants.models import Merchant, DeliverySlot
 from products.models import Product
 from promotions.models import Promotion, PromotionItem
 from users.models import StoreUser
+from wallet.models import Wallet
 
 
 class Command(BaseCommand):
@@ -501,3 +502,20 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(self.style.SUCCESS('MVP 示例数据初始化完成'))
+
+        from decimal import Decimal
+        wallet, created = Wallet.objects.get_or_create(
+            user=buyer,
+            defaults={'balance': Decimal('200.00')}
+        )
+        if created:
+            from wallet.models import WalletTransaction
+            WalletTransaction.objects.create(
+                wallet=wallet,
+                type='topup',
+                amount=Decimal('200.00'),
+                balance_after=Decimal('200.00'),
+                operator_id=merchant_a.users.first().id if merchant_a.users.exists() else 1,
+                remark='线下充值（种子数据）'
+            )
+            self.stdout.write(self.style.SUCCESS('已为买家钱包充值 200 元'))

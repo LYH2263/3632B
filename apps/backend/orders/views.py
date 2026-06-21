@@ -16,6 +16,7 @@ from products.models import Product
 from promotions.models import PromotionItem
 from promotions.utils import increment_sold_quantity
 from users.models import StoreUser
+from wallet.models import InsufficientBalanceError, Wallet
 from .models import Order
 from .serializers import (
     CartValidateSerializer,
@@ -383,12 +384,14 @@ class OrderListView(APIView):
         if total_amount < 0:
             total_amount = Decimal('0')
 
+        pay_method = payload.get('pay_method', 'offline')
+
         order = Order.objects.create(
             buyer=buyer,
             merchant=merchant,
             order_no=generate_order_no(),
             status='pending',
-            pay_method='offline',
+            pay_method=pay_method,
             fulfillment_type=fulfillment_type,
             receiver_name=payload['receiver_name'],
             receiver_phone=payload['receiver_phone'],
@@ -432,7 +435,24 @@ class OrderListView(APIView):
             if promo_item is not None:
                 increment_sold_quantity(promo_item.id, int(item['quantity']))
 
+        if pay_method == 'wallet':
+            try:
+                Wallet.get_or_create_for_user(buyer.id)
+                Wallet.deduct(
+                    user_id=buyer.id,
+                    amount=total_amount,
+                    order_id=order.id,
+                    remark='订单支付'
+                )
+            except InsufficientBalanceError:
+                raise InsufficientBalanceError('余额不足')
+
         return success_response(OrderSerializer(order).data, status_code=201)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, InsufficientBalanceError):
+            return error_response(str(exc), status_code=400)
+        return super().handle_exception(exc)
 
 
 class OrderDetailView(APIView):
@@ -500,6 +520,16 @@ class OrderStatusUpdateView(APIView):
                     order=order,
                     user_coupon=user_coupon
                 ).delete()
+
+        if next_status == 'canceled' and order.pay_method == 'wallet':
+            wallet_exists = Wallet.objects.filter(user_id=order.buyer_id).exists()
+            if wallet_exists:
+                Wallet.refund(
+                    user_id=order.buyer_id,
+                    amount=order.total_amount,
+                    order_id=order.id,
+                    remark='订单取消退款'
+                )
 
         order.status = next_status
         order.save(update_fields=['status', 'updated_at'])

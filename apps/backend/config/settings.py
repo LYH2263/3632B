@@ -25,7 +25,8 @@ INSTALLED_APPS = [
     'announcements',
     'membership',
     'promotions',
-    'tickets'
+    'tickets',
+    'wallet'
 ]
 
 MIDDLEWARE = [

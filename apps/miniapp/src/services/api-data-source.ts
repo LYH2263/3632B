@@ -21,6 +21,7 @@ import {
   type Merchant,
   type Order,
   type OrderStatus,
+  type PayMethod,
   type PointLog,
   type Product,
   type ProductPromotion,
@@ -34,7 +35,9 @@ import {
   type TicketStatus,
   type UpdatePromotionPayload,
   type UserCoupon,
-  type CouponStatus
+  type CouponStatus,
+  type WalletInfo,
+  type WalletTransaction
 } from '@community-store/shared';
 import { readJSON, writeJSON } from '../data/storage';
 import { request } from './http';
@@ -121,7 +124,8 @@ export class ApiDataSource implements DataSource {
       body: JSON.stringify({
         ...payload,
         cart_items: cart.items,
-        coupon_id: payload.coupon_id
+        coupon_id: payload.coupon_id,
+        pay_method: payload.pay_method
       })
     });
     await this.clearCart();
@@ -396,5 +400,13 @@ export class ApiDataSource implements DataSource {
     params.set('merchant_id', String(merchantId));
     params.set('date', date);
     return request<DeliverySlotWithAvailability[]>(`/delivery-slots/availability?${params.toString()}`);
+  }
+
+  async getWallet(): Promise<WalletInfo> {
+    return request<WalletInfo>('/wallet');
+  }
+
+  async listWalletTransactions(): Promise<WalletTransaction[]> {
+    return request<WalletTransaction[]>('/wallet/transactions');
   }
 }

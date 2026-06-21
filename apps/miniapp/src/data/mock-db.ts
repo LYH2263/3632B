@@ -25,11 +25,13 @@ import {
   type Promotion,
   type Ticket,
   type User,
-  type UserCoupon
+  type UserCoupon,
+  type WalletInfo,
+  type WalletTransaction
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 11;
+const MOCK_DB_VERSION = 12;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -56,6 +58,8 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.promotions, seedPromotions);
     writeJSON(STORAGE_KEYS.tickets, seedTickets);
     writeJSON(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
+    writeJSON(STORAGE_KEYS.wallet, { id: 1, user_id: 1, balance: 200, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    writeJSON(STORAGE_KEYS.wallet_transactions, [{ id: 1, type: 'topup', amount: 200, balance_after: 200, order_id: null, operator_id: 2, remark: '线下充值（种子数据）', created_at: new Date().toISOString() }]);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -231,4 +235,22 @@ export function getActivePromotionForProduct(productId: number, now: Date = new 
 export function mergeProductWithPromotion<T extends Product>(product: T): T & { promotion?: ProductPromotion | null } {
   const promotion = getActivePromotionForProduct(product.id);
   return { ...product, promotion };
+}
+
+export function readWallet(): WalletInfo {
+  ensureMockDB();
+  return readJSON<WalletInfo>(STORAGE_KEYS.wallet, { id: 1, user_id: 1, balance: 200, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+}
+
+export function writeWallet(value: WalletInfo): void {
+  writeJSON(STORAGE_KEYS.wallet, value);
+}
+
+export function readWalletTransactions(): WalletTransaction[] {
+  ensureMockDB();
+  return readJSON<WalletTransaction[]>(STORAGE_KEYS.wallet_transactions, []);
+}
+
+export function writeWalletTransactions(value: WalletTransaction[]): void {
+  writeJSON(STORAGE_KEYS.wallet_transactions, value);
 }

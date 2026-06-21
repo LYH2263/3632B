@@ -1,4 +1,4 @@
-import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, FulfillmentType, MemberLevel, OrderStatus } from './types';
+import type { AfterSaleReason, AfterSaleRejectReason, AfterSaleStatus, CouponStatus, FulfillmentType, MemberLevel, OrderStatus, PayMethod, WalletTransactionType } from './types';
 
 export const STORAGE_KEYS = {
   merchants: 'community_store_merchants',
@@ -15,7 +15,9 @@ export const STORAGE_KEYS = {
   announcements: 'community_store_announcements',
   promotions: 'community_store_promotions',
   tickets: 'community_store_tickets',
-  delivery_slots: 'community_store_delivery_slots'
+  delivery_slots: 'community_store_delivery_slots',
+  wallet: 'community_store_wallet',
+  wallet_transactions: 'community_store_wallet_transactions'
 } as const;
 
 export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {
@@ -50,6 +52,17 @@ export const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export const OFFLINE_PAYMENT_TEXT = '线下支付（货到付款或到店支付）';
+
+export const PAY_METHOD_LABELS: Record<PayMethod, string> = {
+  offline: '线下支付',
+  wallet: '余额支付'
+};
+
+export const WALLET_TRANSACTION_TYPE_LABELS: Record<WalletTransactionType, string> = {
+  topup: '充值',
+  payment: '支付',
+  refund: '退款'
+};
 
 export const AFTERSALE_REASON_LABELS: Record<AfterSaleReason, string> = {
   quality: '商品质量问题',

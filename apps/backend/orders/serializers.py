@@ -23,6 +23,7 @@ class OrderCreateSerializer(CartValidateSerializer):
     receiver_phone = serializers.CharField(max_length=20)
     receiver_address = serializers.CharField(max_length=255, required=False, allow_blank=True)
     remark = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    pay_method = serializers.ChoiceField(choices=['offline', 'wallet'], default='offline')
 
 
 class OrderStatusSerializer(serializers.Serializer):

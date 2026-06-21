@@ -89,7 +89,7 @@ export function createOrderFromCart(params: CreateOrderParams): Order {
     buyer_id: params.buyerId,
     merchant_id: params.merchant.id,
     status: 'pending',
-    pay_method: 'offline',
+    pay_method: params.payload.pay_method ?? 'offline',
     fulfillment_type: fulfillmentType,
     receiver_name: params.payload.receiver_name,
     receiver_phone: params.payload.receiver_phone,

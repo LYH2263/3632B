@@ -6,7 +6,47 @@
       <section v-if="merchant" data-testid="checkout-page">
         <article class="card" data-testid="checkout-header-card">
           <h2 data-testid="checkout-merchant-name">购物车结算 - {{ merchant.name }}</h2>
-          <p class="muted" data-testid="checkout-payment-method">支付方式：线下支付（货到付款/到店支付）</p>
+        </article>
+
+        <article class="card payment-card" data-testid="checkout-payment-card">
+          <h3>支付方式</h3>
+          <view class="payment-options">
+            <view
+              class="payment-option"
+              :class="{ active: form.pay_method === 'offline' }"
+              data-testid="payment-option-offline"
+              @click="setPayMethod('offline')"
+              @tap="setPayMethod('offline')"
+            >
+              <view class="payment-icon">💵</view>
+              <view class="payment-content">
+                <view class="payment-label">线下支付</view>
+                <view class="payment-desc">货到付款/到店支付</view>
+              </view>
+              <view class="payment-check" :class="{ checked: form.pay_method === 'offline' }"></view>
+            </view>
+            <view
+              class="payment-option"
+              :class="{ active: form.pay_method === 'wallet' }"
+              data-testid="payment-option-wallet"
+              @click="setPayMethod('wallet')"
+              @tap="setPayMethod('wallet')"
+            >
+              <view class="payment-icon">👛</view>
+              <view class="payment-content">
+                <view class="payment-label">
+                  余额支付
+                  <text v-if="walletInfo" class="payment-balance">¥{{ walletInfo.balance.toFixed(2) }}</text>
+                </view>
+                <view class="payment-desc">
+                  <text v-if="!walletInfo">钱包未开通</text>
+                  <text v-else-if="!walletBalanceSufficient" class="insufficient">余额不足</text>
+                  <text v-else>余额充足</text>
+                </view>
+              </view>
+              <view class="payment-check" :class="{ checked: form.pay_method === 'wallet' }"></view>
+            </view>
+          </view>
         </article>
 
         <article class="card" v-if="cartItems.length" data-testid="checkout-cart-card">
@@ -264,14 +304,17 @@
 <script setup lang="ts">
 import {
   FULFILLMENT_TYPE_LABELS,
+  PAY_METHOD_LABELS,
   validateCartForCheckout,
   validateCheckoutPayload,
   type CheckoutPayload,
   type DeliverySlotWithAvailability,
   type FulfillmentType,
   type Merchant,
+  type PayMethod,
   type Product,
-  type UserCoupon
+  type UserCoupon,
+  type WalletInfo
 } from '@community-store/shared';
 import { computed, reactive, ref, watch } from 'vue';
 import { onLoad, onShow } from '@dcloudio/uni-app';
@@ -297,6 +340,7 @@ const couponPickerVisible = ref(false);
 const loadingCoupons = ref(false);
 const availableSlots = ref<DeliverySlotWithAvailability[]>([]);
 const loadingSlots = ref(false);
+const walletInfo = ref<WalletInfo | null>(null);
 const dateOptions = computed(() => {
   const options = [];
   const today = new Date();
@@ -314,6 +358,7 @@ const dateOptions = computed(() => {
 });
 const form = reactive({
   fulfillment_type: 'delivery' as FulfillmentType,
+  pay_method: 'offline' as PayMethod,
   receiver_name: '',
   receiver_phone: '',
   receiver_address: '',
@@ -383,6 +428,24 @@ const totalAmount = computed(() => {
   return Math.max(0, total);
 });
 
+const walletBalanceSufficient = computed(() => {
+  if (!walletInfo.value) return false;
+  return walletInfo.value.balance >= totalAmount.value;
+});
+
+async function loadWallet(): Promise<void> {
+  if (!sessionStore.state.user?.id) return;
+  try {
+    walletInfo.value = await dataSource.getWallet();
+  } catch {
+    walletInfo.value = null;
+  }
+}
+
+function setPayMethod(method: PayMethod): void {
+  form.pay_method = method;
+}
+
 async function loadData(): Promise<void> {
   await cartStore.ensureLoaded();
   if (!merchantId.value) {
@@ -398,7 +461,7 @@ async function loadData(): Promise<void> {
   if (form.fulfillment_type === 'delivery' && !form.scheduled_date && dateOptions.value.length) {
     form.scheduled_date = dateOptions.value[0].value;
   }
-  await Promise.all([loadAvailableCoupons(), loadAvailableSlots()]);
+  await Promise.all([loadAvailableCoupons(), loadAvailableSlots(), loadWallet()]);
 }
 
 async function loadAvailableCoupons(): Promise<void> {
@@ -536,6 +599,7 @@ async function submitOrder(): Promise<void> {
       buyer_id: sessionStore.state.user.id,
       merchant_id: merchant.value.id,
       fulfillment_type: form.fulfillment_type,
+      pay_method: form.pay_method,
       receiver_name: form.receiver_name,
       receiver_phone: form.receiver_phone,
       receiver_address: form.receiver_address,
@@ -612,6 +676,107 @@ onShow(loadData);
 </script>
 
 <style lang="scss" scoped>
+.payment-card {
+  h3 {
+    margin-bottom: 16rpx;
+  }
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx;
+  border: 2rpx solid #e5e5e5;
+  border-radius: 12rpx;
+  background: #fff;
+  transition: all 0.2s;
+
+  &.active {
+    border-color: #4a90e2;
+    background: #e8f4ff;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.payment-icon {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+
+.payment-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.payment-label {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.payment-balance {
+  font-size: 24rpx;
+  color: #4a90e2;
+  font-weight: 400;
+}
+
+.payment-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.insufficient {
+  color: #e74c3c;
+}
+
+.payment-check {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d0d0d0;
+  flex-shrink: 0;
+  transition: all 0.2s;
+
+  &.checked {
+    border-color: #4a90e2;
+    background: #4a90e2;
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16rpx;
+      height: 10rpx;
+      border-left: 3rpx solid #fff;
+      border-bottom: 3rpx solid #fff;
+      transform: translate(-50%, -60%) rotate(-45deg);
+    }
+  }
+}
+
 .schedule-card {
   h3 {
     margin-bottom: 16rpx;

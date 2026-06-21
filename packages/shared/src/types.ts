@@ -2,6 +2,8 @@ export type UserRole = 'buyer' | 'merchant';
 
 export type FulfillmentType = 'delivery' | 'pickup';
 
+export type PayMethod = 'offline' | 'wallet';
+
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
@@ -89,7 +91,7 @@ export interface Order {
   buyer_id: number;
   merchant_id: number;
   status: OrderStatus;
-  pay_method: 'offline';
+  pay_method: PayMethod;
   fulfillment_type: FulfillmentType;
   receiver_name: string;
   receiver_phone: string;
@@ -118,6 +120,7 @@ export interface CheckoutPayload {
   coupon_id?: number;
   scheduled_date?: string | null;
   scheduled_slot_id?: number | null;
+  pay_method?: PayMethod;
 }
 
 export interface CartValidationResult {
@@ -378,6 +381,27 @@ export interface UpdatePromotionPayload {
   }>;
 }
 
+export type WalletTransactionType = 'topup' | 'payment' | 'refund';
+
+export interface WalletInfo {
+  id: number;
+  user_id: number;
+  balance: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WalletTransaction {
+  id: number;
+  type: WalletTransactionType;
+  amount: number;
+  balance_after: number;
+  order_id: number | null;
+  operator_id: number | null;
+  remark: string;
+  created_at: string;
+}
+
 export interface DataSource {
   listMerchants(): Promise<Merchant[]>;
   getMerchant(merchantId: number): Promise<Merchant | null>;
@@ -448,6 +472,9 @@ export interface DataSource {
   updateDeliverySlot(slotId: number, payload: Partial<Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>>): Promise<DeliverySlot>;
   deleteDeliverySlot(slotId: number): Promise<void>;
   listAvailableDeliverySlots(merchantId: number, date: string): Promise<DeliverySlotWithAvailability[]>;
+
+  getWallet(): Promise<WalletInfo>;
+  listWalletTransactions(): Promise<WalletTransaction[]>;
 }
 
 export type TicketType = 'delivery' | 'product' | 'other';

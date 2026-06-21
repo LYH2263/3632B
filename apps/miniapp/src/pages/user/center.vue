@@ -71,6 +71,21 @@
         </view>
 
         <view class="section-header">
+          <text class="section-title">我的钱包</text>
+        </view>
+
+        <view class="service-cards">
+          <view class="service-card" @click="goToWallet" @tap="goToWallet">
+            <view class="service-icon" style="background: linear-gradient(135deg, #d1fae5, #a7f3d0);">👛</view>
+            <view class="service-content">
+              <text class="service-title">钱包</text>
+              <text class="service-desc">余额 · 充值 · 流水</text>
+            </view>
+            <view class="service-arrow">›</view>
+          </view>
+        </view>
+
+        <view class="section-header">
           <text class="section-title">客服中心</text>
         </view>
 
@@ -177,6 +192,10 @@ async function loadLogs(): Promise<void> {
 
 function goToTickets(): void {
   uni.navigateTo({ url: '/pages/ticket/list' });
+}
+
+function goToWallet(): void {
+  uni.navigateTo({ url: '/pages/wallet/index' });
 }
 
 onMounted(() => {

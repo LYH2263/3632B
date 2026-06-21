@@ -25,6 +25,7 @@ import {
   type Merchant,
   type Order,
   type OrderStatus,
+  type PayMethod,
   type PointLog,
   type Product,
   type ProductPromotion,
@@ -38,7 +39,9 @@ import {
   type TicketStatus,
   type UpdatePromotionPayload,
   type UserCoupon,
-  type CouponStatus
+  type CouponStatus,
+  type WalletInfo,
+  type WalletTransaction
 } from '@community-store/shared';
 import {
   ensureMockDB,
@@ -58,6 +61,8 @@ import {
   readTickets,
   readUserCoupons,
   readUsers,
+  readWallet,
+  readWalletTransactions,
   writeAfterSales,
   writeCart,
   writeCouponRedeemRecords,
@@ -69,7 +74,9 @@ import {
   writeReviews,
   writeTickets,
   writeUserCoupons,
-  writeProducts
+  writeProducts,
+  writeWallet,
+  writeWalletTransactions
 } from '../data/mock-db';
 
 function nextId(items: Array<{ id: number }>): number {
@@ -264,6 +271,34 @@ export class MockDataSource implements DataSource {
 
     orders.push(order);
     writeOrders(orders);
+
+    const payMethod = payload.pay_method ?? 'offline';
+    if (payMethod === 'wallet') {
+      const wallet = readWallet();
+      if (wallet.balance < order.total_amount) {
+        writeOrders(orders.filter((o) => o.id !== order.id));
+        throw new Error('余额不足');
+      }
+      wallet.balance = Math.round((wallet.balance - order.total_amount) * 100) / 100;
+      wallet.updated_at = new Date().toISOString();
+      writeWallet(wallet);
+
+      const txns = readWalletTransactions();
+      txns.push({
+        id: nextId(txns),
+        type: 'payment',
+        amount: order.total_amount,
+        balance_after: wallet.balance,
+        order_id: order.id,
+        operator_id: null,
+        remark: '订单支付',
+        created_at: new Date().toISOString()
+      });
+      writeWalletTransactions(txns);
+      order.pay_method = 'wallet';
+      writeOrders(orders);
+    }
+
     writeCart({
       ...emptyCart,
       updated_at: new Date().toISOString()
@@ -304,6 +339,26 @@ export class MockDataSource implements DataSource {
       const redeemRecords = readCouponRedeemRecords();
       const filteredRecords = redeemRecords.filter((r) => r.order_id !== orderId);
       writeCouponRedeemRecords(filteredRecords);
+    }
+
+    if (status === 'canceled' && target.pay_method === 'wallet') {
+      const wallet = readWallet();
+      wallet.balance = Math.round((wallet.balance + target.total_amount) * 100) / 100;
+      wallet.updated_at = new Date().toISOString();
+      writeWallet(wallet);
+
+      const txns = readWalletTransactions();
+      txns.push({
+        id: nextId(txns),
+        type: 'refund',
+        amount: target.total_amount,
+        balance_after: wallet.balance,
+        order_id: target.id,
+        operator_id: null,
+        remark: '订单取消退款',
+        created_at: new Date().toISOString()
+      });
+      writeWalletTransactions(txns);
     }
 
     target.status = status;
@@ -1093,5 +1148,13 @@ export class MockDataSource implements DataSource {
         available: usedCount < slot.capacity
       };
     });
+  }
+
+  async getWallet(): Promise<WalletInfo> {
+    return readWallet();
+  }
+
+  async listWalletTransactions(): Promise<WalletTransaction[]> {
+    return readWalletTransactions().sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 }

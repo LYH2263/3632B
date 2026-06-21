@@ -36,6 +36,7 @@ from tickets.views import (
     TicketStatusUpdateView,
     TicketMessageCreateView
 )
+from wallet.views import WalletDetailView, WalletTransactionListView, TopupView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -77,5 +78,8 @@ urlpatterns = [
     path('api/v1/tickets/create', TicketCreateView.as_view(), name='ticket-create'),
     path('api/v1/tickets/<int:ticket_id>', TicketDetailView.as_view(), name='ticket-detail'),
     path('api/v1/tickets/<int:ticket_id>/status', TicketStatusUpdateView.as_view(), name='ticket-status'),
-    path('api/v1/tickets/messages', TicketMessageCreateView.as_view(), name='ticket-message-create')
+    path('api/v1/tickets/messages', TicketMessageCreateView.as_view(), name='ticket-message-create'),
+    path('api/v1/wallet', WalletDetailView.as_view(), name='wallet-detail'),
+    path('api/v1/wallet/transactions', WalletTransactionListView.as_view(), name='wallet-transactions'),
+    path('api/v1/wallet/topup', TopupView.as_view(), name='wallet-topup')
 ]
