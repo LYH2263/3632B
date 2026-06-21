@@ -66,6 +66,23 @@ export interface OrderSnapshotItem {
   subtotal: number;
 }
 
+export interface DeliverySlot {
+  id: number;
+  merchant_id: number;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliverySlotWithAvailability extends DeliverySlot {
+  scheduled_date: string;
+  used_count: number;
+  available: boolean;
+}
+
 export interface Order {
   id: number;
   order_no: string;
@@ -78,6 +95,8 @@ export interface Order {
   receiver_phone: string;
   receiver_address: string;
   remark: string;
+  scheduled_date?: string | null;
+  scheduled_slot?: string | null;
   items_amount: number;
   delivery_fee: number;
   discount_amount: number;
@@ -97,6 +116,8 @@ export interface CheckoutPayload {
   receiver_address: string;
   remark?: string;
   coupon_id?: number;
+  scheduled_date?: string | null;
+  scheduled_slot_id?: number | null;
 }
 
 export interface CartValidationResult {
@@ -421,6 +442,12 @@ export interface DataSource {
   getTicket(ticketId: number): Promise<Ticket | null>;
   updateTicketStatus(ticketId: number, status: TicketStatus): Promise<Ticket>;
   createTicketMessage(payload: CreateTicketMessagePayload): Promise<TicketMessage>;
+
+  listDeliverySlots(merchantId: number): Promise<DeliverySlot[]>;
+  createDeliverySlot(merchantId: number, payload: Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>): Promise<DeliverySlot>;
+  updateDeliverySlot(slotId: number, payload: Partial<Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>>): Promise<DeliverySlot>;
+  deleteDeliverySlot(slotId: number): Promise<void>;
+  listAvailableDeliverySlots(merchantId: number, date: string): Promise<DeliverySlotWithAvailability[]>;
 }
 
 export type TicketType = 'delivery' | 'product' | 'other';

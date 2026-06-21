@@ -18,6 +18,8 @@ import {
   type CreateTicketPayload,
   type CreateTicketMessagePayload,
   type DataSource,
+  type DeliverySlot,
+  type DeliverySlotWithAvailability,
   type LoginPayload,
   type LoginResult,
   type Merchant,
@@ -47,6 +49,7 @@ import {
   readCart,
   readCouponRedeemRecords,
   readCouponTemplates,
+  readDeliverySlots,
   readMerchants,
   readOrders,
   readProducts,
@@ -59,6 +62,7 @@ import {
   writeCart,
   writeCouponRedeemRecords,
   writeCouponTemplates,
+  writeDeliverySlots,
   writeMerchants,
   writeOrders,
   writePromotions,
@@ -1005,5 +1009,89 @@ export class MockDataSource implements DataSource {
     tickets[idx] = ticket;
     writeTickets(tickets);
     return message;
+  }
+
+  async listDeliverySlots(merchantId: number): Promise<DeliverySlot[]> {
+    return readDeliverySlots()
+      .filter((s) => s.merchant_id === merchantId && s.is_active)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }
+
+  async createDeliverySlot(
+    merchantId: number,
+    payload: Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>
+  ): Promise<DeliverySlot> {
+    const slots = readDeliverySlots();
+    const now = new Date().toISOString();
+    const newSlot: DeliverySlot = {
+      id: nextId(slots),
+      merchant_id: merchantId,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      capacity: payload.capacity,
+      is_active: payload.is_active,
+      created_at: now,
+      updated_at: now
+    };
+    slots.push(newSlot);
+    writeDeliverySlots(slots);
+    return newSlot;
+  }
+
+  async updateDeliverySlot(
+    slotId: number,
+    payload: Partial<Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>>
+  ): Promise<DeliverySlot> {
+    const slots = readDeliverySlots();
+    const idx = slots.findIndex((s) => s.id === slotId);
+    if (idx === -1) {
+      throw new Error('时段不存在');
+    }
+    slots[idx] = {
+      ...slots[idx],
+      ...payload,
+      updated_at: new Date().toISOString()
+    };
+    writeDeliverySlots(slots);
+    return slots[idx];
+  }
+
+  async deleteDeliverySlot(slotId: number): Promise<void> {
+    const slots = readDeliverySlots();
+    const filtered = slots.filter((s) => s.id !== slotId);
+    writeDeliverySlots(filtered);
+  }
+
+  async listAvailableDeliverySlots(merchantId: number, dateStr: string): Promise<DeliverySlotWithAvailability[]> {
+    const slots = await this.listDeliverySlots(merchantId);
+    const orders = readOrders();
+    const today = new Date().toISOString().split('T')[0];
+
+    if (dateStr < today) {
+      throw new Error('不能选择过去的日期');
+    }
+
+    const usedCounts = new Map<number, number>();
+    for (const order of orders) {
+      if (
+        order.merchant_id === merchantId &&
+        order.scheduled_date === dateStr &&
+        order.scheduled_slot &&
+        ['pending', 'confirmed', 'delivering', 'pickup_ready', 'completed'].includes(order.status)
+      ) {
+        const slotId = typeof order.scheduled_slot === 'object' ? order.scheduled_slot.id : order.scheduled_slot;
+        usedCounts.set(slotId, (usedCounts.get(slotId) || 0) + 1);
+      }
+    }
+
+    return slots.map((slot) => {
+      const usedCount = usedCounts.get(slot.id) || 0;
+      return {
+        ...slot,
+        scheduled_date: dateStr,
+        used_count: usedCount,
+        available: usedCount < slot.capacity
+      };
+    });
   }
 }

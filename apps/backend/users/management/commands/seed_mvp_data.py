@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from coupons.models import CouponTemplate
-from merchants.models import Merchant
+from merchants.models import Merchant, DeliverySlot
 from products.models import Product
 from promotions.models import Promotion, PromotionItem
 from users.models import StoreUser
@@ -219,6 +219,42 @@ class Command(BaseCommand):
                     'promo_price': 3.8,
                     'promo_stock': -1,
                     'sold_quantity': 0
+                }
+            )
+
+        delivery_slots_merchant_a = [
+            {'start_time': '09:00', 'end_time': '11:00', 'capacity': 10},
+            {'start_time': '11:00', 'end_time': '13:00', 'capacity': 8},
+            {'start_time': '14:00', 'end_time': '16:00', 'capacity': 12},
+            {'start_time': '16:00', 'end_time': '18:00', 'capacity': 15},
+            {'start_time': '18:00', 'end_time': '20:00', 'capacity': 10},
+        ]
+
+        for slot_data in delivery_slots_merchant_a:
+            DeliverySlot.objects.get_or_create(
+                merchant=merchant_a,
+                start_time=slot_data['start_time'],
+                end_time=slot_data['end_time'],
+                defaults={
+                    'capacity': slot_data['capacity'],
+                    'is_active': True
+                }
+            )
+
+        delivery_slots_merchant_b = [
+            {'start_time': '10:00', 'end_time': '12:00', 'capacity': 6},
+            {'start_time': '15:00', 'end_time': '17:00', 'capacity': 6},
+            {'start_time': '17:00', 'end_time': '19:00', 'capacity': 8},
+        ]
+
+        for slot_data in delivery_slots_merchant_b:
+            DeliverySlot.objects.get_or_create(
+                merchant=merchant_b,
+                start_time=slot_data['start_time'],
+                end_time=slot_data['end_time'],
+                defaults={
+                    'capacity': slot_data['capacity'],
+                    'is_active': True
                 }
             )
 

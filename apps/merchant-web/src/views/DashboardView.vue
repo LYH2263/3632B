@@ -164,6 +164,66 @@
       </div>
     </el-card>
 
+    <el-card class="block" ref="deliverySlotSection" data-testid="web-delivery-slot-card">
+      <template #header>
+        <div class="block-header">
+          <div class="block-title" data-testid="web-delivery-slot-card-title">配送时段配置</div>
+          <el-button type="primary" data-testid="web-delivery-slot-open-create" @click="openCreateDeliverySlotDialog">新增时段</el-button>
+        </div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="deliverySlots" stripe data-testid="web-delivery-slot-table">
+        <el-table-column label="时段" min-width="160">
+          <template #default="scope">{{ scope.row.start_time }} - {{ scope.row.end_time }}</template>
+        </el-table-column>
+        <el-table-column label="容量" width="100">
+          <template #default="scope">{{ scope.row.capacity }} 单</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.is_active ? 'success' : 'info'" size="small">
+              {{ scope.row.is_active ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="scope">
+            <el-space>
+              <el-button
+                size="small"
+                :data-testid="`web-delivery-slot-edit-${scope.row.id}`"
+                @click="openEditDeliverySlotDialog(scope.row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                size="small"
+                type="warning"
+                :data-testid="`web-delivery-slot-toggle-${scope.row.id}`"
+                @click="toggleDeliverySlot(scope.row)"
+              >
+                {{ scope.row.is_active ? '停用' : '启用' }}
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                :data-testid="`web-delivery-slot-delete-${scope.row.id}`"
+                @click="deleteDeliverySlot(scope.row.id)"
+              >
+                删除
+              </el-button>
+            </el-space>
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!deliverySlots.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无配送时段配置
+      </div>
+    </el-card>
+
     <el-card class="block" ref="orderSection" data-testid="web-order-card">
       <template #header>
         <div class="block-title" data-testid="web-order-card-title">订单管理</div>
@@ -182,6 +242,14 @@
             <el-tag :type="scope.row.fulfillment_type === 'pickup' ? 'warning' : 'primary'" size="small">
               {{ fulfillmentTypeLabel(scope.row.fulfillment_type) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="预约送达" min-width="180">
+          <template #default="scope">
+            <span v-if="scope.row.scheduled_date && scope.row.scheduled_slot" style="color: #409eff;">
+              {{ formatScheduledInfo(scope.row) }}
+            </span>
+            <span v-else style="color: #909399;">-</span>
           </template>
         </el-table-column>
         <el-table-column label="联系信息" min-width="180">
@@ -451,6 +519,59 @@
     </el-dialog>
 
     <el-dialog
+      v-model="deliverySlotDialogVisible"
+      :title="editingDeliverySlotId ? '编辑配送时段' : '新增配送时段'"
+      width="480px"
+      data-testid="web-delivery-slot-dialog"
+    >
+      <el-form :model="deliverySlotForm" label-width="90px" data-testid="web-delivery-slot-form">
+        <el-form-item label="开始时间">
+          <el-time-picker
+            v-model="deliverySlotForm.start_time"
+            format="HH:mm"
+            value-format="HH:mm"
+            placeholder="选择开始时间"
+            data-testid="web-delivery-slot-start"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="结束时间">
+          <el-time-picker
+            v-model="deliverySlotForm.end_time"
+            format="HH:mm"
+            value-format="HH:mm"
+            placeholder="选择结束时间"
+            data-testid="web-delivery-slot-end"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item label="容量">
+          <el-input-number
+            v-model="deliverySlotForm.capacity"
+            :min="1"
+            :max="999"
+            :step="1"
+            data-testid="web-delivery-slot-capacity"
+          />
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">单</span>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-switch
+            v-model="deliverySlotForm.is_active"
+            data-testid="web-delivery-slot-active"
+            active-text="启用"
+            inactive-text="停用"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button data-testid="web-delivery-slot-cancel" @click="deliverySlotDialogVisible = false">取消</el-button>
+        <el-button type="primary" data-testid="web-delivery-slot-save" @click="saveDeliverySlot">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="orderDetailVisible"
       title="订单详情（配货单/价格表）"
       width="760px"
@@ -460,6 +581,9 @@
         <p data-testid="web-order-detail-order-no">订单号：{{ activeOrder.order_no }}</p>
         <p>支付方式：线下支付</p>
         <p>履约方式：{{ fulfillmentTypeLabel(activeOrder.fulfillment_type) }}</p>
+        <p v-if="activeOrder.fulfillment_type === 'delivery' && activeOrder.scheduled_date && activeOrder.scheduled_slot" style="color: #409eff;">
+          预约送达：{{ formatScheduledInfo(activeOrder) }}
+        </p>
         <p>联系人：{{ activeOrder.receiver_name }} / {{ activeOrder.receiver_phone }}</p>
         <p>{{ activeOrder.fulfillment_type === 'pickup' ? '自提地址' : '收货地址' }}：{{ activeOrder.receiver_address }}</p>
         <p>备注：{{ activeOrder.remark || '无' }}</p>
@@ -817,6 +941,7 @@ import {
   type CouponRedeemRecord,
   type CreatePromotionPayload,
   type CreateTicketMessagePayload,
+  type DeliverySlot,
   type FulfillmentType,
   type Merchant,
   type Order,
@@ -844,6 +969,15 @@ const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
 const reviews = ref<ProductReview[]>([]);
 const aftersales = ref<AfterSale[]>([]);
 const promotions = ref<Promotion[]>([]);
+const deliverySlots = ref<DeliverySlot[]>([]);
+const deliverySlotDialogVisible = ref(false);
+const editingDeliverySlotId = ref<number | null>(null);
+const deliverySlotForm = reactive({
+  start_time: '09:00',
+  end_time: '11:00',
+  capacity: 10,
+  is_active: true
+});
 const tickets = ref<Ticket[]>([]);
 const ticketsPage = ref(1);
 const ticketsPageSize = ref(10);
@@ -902,6 +1036,8 @@ const ticketSection = ref<{ $el: HTMLElement } | null>(null);
 
 const promotionSection = ref<{ $el: HTMLElement } | null>(null);
 
+const deliverySlotSection = ref<{ $el: HTMLElement } | null>(null);
+
 const merchantSection = ref<{ $el: HTMLElement } | null>(null);
 const productSection = ref<{ $el: HTMLElement } | null>(null);
 const orderSection = ref<{ $el: HTMLElement } | null>(null);
@@ -914,6 +1050,7 @@ const sections = [
   { key: 'merchant', label: '店铺信息' },
   { key: 'product', label: '商品管理' },
   { key: 'promotion', label: '促销管理' },
+  { key: 'deliverySlot', label: '时段配置' },
   { key: 'order', label: '订单管理' },
   { key: 'coupon', label: '核销记录' },
   { key: 'review', label: '评价管理' },
@@ -925,6 +1062,7 @@ const sectionRefs: Record<string, typeof merchantSection> = {
   merchant: merchantSection,
   product: productSection,
   promotion: promotionSection,
+  deliverySlot: deliverySlotSection,
   order: orderSection,
   coupon: couponSection,
   review: reviewSection,
@@ -1012,6 +1150,7 @@ async function loadData(): Promise<void> {
   reviews.value = await merchantService.listReviews(merchantId.value);
   aftersales.value = await merchantService.listAfterSales(merchantId.value);
   promotions.value = await merchantService.listPromotions(merchantId.value);
+  deliverySlots.value = await merchantService.listDeliverySlots(merchantId.value);
   await loadTickets();
 }
 
@@ -1415,6 +1554,100 @@ async function deletePromotion(promotionId: number): Promise<void> {
   } catch (error) {
     ElMessage.error((error as Error).message);
   }
+}
+
+function resetDeliverySlotForm(): void {
+  editingDeliverySlotId.value = null;
+  deliverySlotForm.start_time = '09:00';
+  deliverySlotForm.end_time = '11:00';
+  deliverySlotForm.capacity = 10;
+  deliverySlotForm.is_active = true;
+}
+
+function openCreateDeliverySlotDialog(): void {
+  resetDeliverySlotForm();
+  deliverySlotDialogVisible.value = true;
+}
+
+function openEditDeliverySlotDialog(slot: DeliverySlot): void {
+  editingDeliverySlotId.value = slot.id;
+  deliverySlotForm.start_time = slot.start_time;
+  deliverySlotForm.end_time = slot.end_time;
+  deliverySlotForm.capacity = slot.capacity;
+  deliverySlotForm.is_active = slot.is_active;
+  deliverySlotDialogVisible.value = true;
+}
+
+async function saveDeliverySlot(): Promise<void> {
+  if (!merchantId.value) return;
+  if (!deliverySlotForm.start_time || !deliverySlotForm.end_time) {
+    ElMessage.error('请填写时段时间');
+    return;
+  }
+  if (deliverySlotForm.start_time >= deliverySlotForm.end_time) {
+    ElMessage.error('开始时间必须早于结束时间');
+    return;
+  }
+  if (deliverySlotForm.capacity < 1) {
+    ElMessage.error('容量必须大于0');
+    return;
+  }
+
+  try {
+    if (editingDeliverySlotId.value) {
+      await merchantService.updateDeliverySlot(editingDeliverySlotId.value, {
+        start_time: deliverySlotForm.start_time,
+        end_time: deliverySlotForm.end_time,
+        capacity: deliverySlotForm.capacity,
+        is_active: deliverySlotForm.is_active
+      });
+      ElMessage.success('时段已更新');
+    } else {
+      await merchantService.createDeliverySlot(merchantId.value, {
+        start_time: deliverySlotForm.start_time,
+        end_time: deliverySlotForm.end_time,
+        capacity: deliverySlotForm.capacity,
+        is_active: deliverySlotForm.is_active
+      });
+      ElMessage.success('时段已创建');
+    }
+    deliverySlotDialogVisible.value = false;
+    resetDeliverySlotForm();
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function deleteDeliverySlot(slotId: number): Promise<void> {
+  try {
+    await merchantService.deleteDeliverySlot(slotId);
+    ElMessage.success('时段已删除');
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function toggleDeliverySlot(slot: DeliverySlot): Promise<void> {
+  try {
+    await merchantService.updateDeliverySlot(slot.id, {
+      is_active: !slot.is_active
+    });
+    ElMessage.success('时段状态已更新');
+    await loadData();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+function formatScheduledInfo(order: Order): string {
+  if (!order.scheduled_date || !order.scheduled_slot) {
+    return '无预约';
+  }
+  const slot = typeof order.scheduled_slot === 'object' ? order.scheduled_slot : null;
+  if (!slot) return '无预约';
+  return `${order.scheduled_date} ${slot.start_time}-${slot.end_time}`;
 }
 
 function logout(): void {

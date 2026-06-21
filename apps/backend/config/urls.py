@@ -2,7 +2,13 @@ from django.contrib import admin
 from django.urls import path
 
 from users.views import LoginView, RegisterMerchantView
-from merchants.views import MerchantListView, MerchantDetailView
+from merchants.views import (
+    MerchantListView,
+    MerchantDetailView,
+    DeliverySlotListView,
+    DeliverySlotDetailView,
+    DeliverySlotAvailabilityView
+)
 from products.views import ProductListView, ProductDetailView, StockLedgerListView
 from orders.views import CartValidateView, OrderDetailView, OrderListView, OrderStatusUpdateView
 from coupons.views import (
@@ -37,6 +43,9 @@ urlpatterns = [
     path('api/v1/auth/register-merchant', RegisterMerchantView.as_view(), name='auth-register-merchant'),
     path('api/v1/merchants', MerchantListView.as_view(), name='merchant-list'),
     path('api/v1/merchants/<int:merchant_id>', MerchantDetailView.as_view(), name='merchant-detail'),
+    path('api/v1/delivery-slots', DeliverySlotListView.as_view(), name='delivery-slot-list'),
+    path('api/v1/delivery-slots/<int:slot_id>', DeliverySlotDetailView.as_view(), name='delivery-slot-detail'),
+    path('api/v1/delivery-slots/availability', DeliverySlotAvailabilityView.as_view(), name='delivery-slot-availability'),
     path('api/v1/products', ProductListView.as_view(), name='product-list'),
     path('api/v1/products/<int:product_id>', ProductDetailView.as_view(), name='product-detail'),
     path('api/v1/products/stock-ledgers', StockLedgerListView.as_view(), name='stock-ledger-list'),

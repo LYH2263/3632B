@@ -1,4 +1,4 @@
-import type { Announcement, Cart, CouponTemplate, Merchant, Product, Promotion, User } from './types';
+import type { Announcement, Cart, CouponTemplate, DeliverySlot, Merchant, Product, Promotion, User } from './types';
 
 export const seedUsers: User[] = [
   {
@@ -243,5 +243,90 @@ export const seedPromotions: Promotion[] = [
     ],
     created_at: new Date(Date.now() - 86400000).toISOString(),
     updated_at: new Date(Date.now() - 86400000).toISOString()
+  }
+];
+
+const now = new Date().toISOString();
+
+export const seedDeliverySlots: DeliverySlot[] = [
+  {
+    id: 1,
+    merchant_id: 1,
+    start_time: '09:00',
+    end_time: '11:00',
+    capacity: 10,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 2,
+    merchant_id: 1,
+    start_time: '11:00',
+    end_time: '13:00',
+    capacity: 8,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 3,
+    merchant_id: 1,
+    start_time: '14:00',
+    end_time: '16:00',
+    capacity: 12,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 4,
+    merchant_id: 1,
+    start_time: '16:00',
+    end_time: '18:00',
+    capacity: 15,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 5,
+    merchant_id: 1,
+    start_time: '18:00',
+    end_time: '20:00',
+    capacity: 10,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 6,
+    merchant_id: 2,
+    start_time: '10:00',
+    end_time: '12:00',
+    capacity: 6,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 7,
+    merchant_id: 2,
+    start_time: '15:00',
+    end_time: '17:00',
+    capacity: 6,
+    is_active: true,
+    created_at: now,
+    updated_at: now
+  },
+  {
+    id: 8,
+    merchant_id: 2,
+    start_time: '17:00',
+    end_time: '19:00',
+    capacity: 8,
+    is_active: true,
+    created_at: now,
+    updated_at: now
   }
 ];

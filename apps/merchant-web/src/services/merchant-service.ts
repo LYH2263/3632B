@@ -1,5 +1,6 @@
 import {
   canTransitionStatus,
+  seedDeliverySlots,
   seedMerchants,
   seedProducts,
   seedPromotions,
@@ -9,6 +10,7 @@ import {
   type CouponRedeemRecord,
   type CreatePromotionPayload,
   type CreateTicketMessagePayload,
+  type DeliverySlot,
   type LoginPayload,
   type Merchant,
   type Order,
@@ -82,7 +84,7 @@ function writeAuthSession(session: AuthSession): void {
   writeJSON(AUTH_KEY, session);
 }
 
-const MOCK_DB_VERSION = 3;
+const MOCK_DB_VERSION = 4;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureMockStorage(): void {
@@ -92,6 +94,7 @@ function ensureMockStorage(): void {
     writeJSON(STORAGE_KEYS.products, seedProducts);
     writeJSON(STORAGE_KEYS.users, seedUsers);
     writeJSON(STORAGE_KEYS.promotions, seedPromotions);
+    writeJSON(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -119,6 +122,20 @@ function ensureMockStorage(): void {
   if (!promotions) {
     writeJSON(STORAGE_KEYS.promotions, seedPromotions);
   }
+
+  const deliverySlots = readJSON<DeliverySlot[] | null>(STORAGE_KEYS.delivery_slots, null);
+  if (!deliverySlots) {
+    writeJSON(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
+  }
+}
+
+function readDeliverySlots(): DeliverySlot[] {
+  ensureMockStorage();
+  return readJSON(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
+}
+
+function writeDeliverySlots(value: DeliverySlot[]): void {
+  writeJSON(STORAGE_KEYS.delivery_slots, value);
 }
 
 function readMerchants(): Merchant[] {
@@ -812,6 +829,82 @@ class MerchantService {
     tickets[idx] = ticket;
     writeJSON(STORAGE_KEYS.tickets, tickets);
     return message;
+  }
+
+  async listDeliverySlots(merchantId: number): Promise<DeliverySlot[]> {
+    if (this.config.dataMode === 'api') {
+      return request<DeliverySlot[]>(`/delivery-slots?merchant_id=${merchantId}`);
+    }
+
+    return readDeliverySlots()
+      .filter((s) => s.merchant_id === merchantId)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }
+
+  async createDeliverySlot(
+    merchantId: number,
+    payload: Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>
+  ): Promise<DeliverySlot> {
+    if (this.config.dataMode === 'api') {
+      return request<DeliverySlot>('/delivery-slots', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, merchant_id: merchantId })
+      });
+    }
+
+    const slots = readDeliverySlots();
+    const now = new Date().toISOString();
+    const newSlot: DeliverySlot = {
+      id: nextId(slots),
+      merchant_id: merchantId,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      capacity: payload.capacity,
+      is_active: payload.is_active,
+      created_at: now,
+      updated_at: now
+    };
+    slots.push(newSlot);
+    writeDeliverySlots(slots);
+    return newSlot;
+  }
+
+  async updateDeliverySlot(
+    slotId: number,
+    payload: Partial<Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>>
+  ): Promise<DeliverySlot> {
+    if (this.config.dataMode === 'api') {
+      return request<DeliverySlot>(`/delivery-slots/${slotId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const slots = readDeliverySlots();
+    const idx = slots.findIndex((s) => s.id === slotId);
+    if (idx === -1) {
+      throw new Error('时段不存在');
+    }
+    slots[idx] = {
+      ...slots[idx],
+      ...payload,
+      updated_at: new Date().toISOString()
+    };
+    writeDeliverySlots(slots);
+    return slots[idx];
+  }
+
+  async deleteDeliverySlot(slotId: number): Promise<void> {
+    if (this.config.dataMode === 'api') {
+      await request<void>(`/delivery-slots/${slotId}`, {
+        method: 'DELETE'
+      });
+      return;
+    }
+
+    const slots = readDeliverySlots();
+    const filtered = slots.filter((s) => s.id !== slotId);
+    writeDeliverySlots(filtered);
   }
 }
 

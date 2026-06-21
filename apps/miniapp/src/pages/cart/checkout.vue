@@ -108,6 +108,51 @@
           </view>
         </article>
 
+        <article class="card schedule-card" v-if="form.fulfillment_type === 'delivery'" data-testid="checkout-schedule-card">
+          <h3>选择配送时间</h3>
+          <view class="date-selector">
+            <scroll-view scroll-x class="date-scroll" data-testid="checkout-date-scroll">
+              <view
+                v-for="dateOpt in dateOptions"
+                :key="dateOpt.value"
+                class="date-item"
+                :class="{ active: form.scheduled_date === dateOpt.value }"
+                @click="selectDate(dateOpt.value)"
+                @tap="selectDate(dateOpt.value)"
+                :data-testid="`checkout-date-${dateOpt.value}`"
+              >
+                {{ dateOpt.label }}
+              </view>
+            </scroll-view>
+          </view>
+          <view v-if="loadingSlots" class="slots-loading" data-testid="checkout-slots-loading">
+            加载时段中...
+          </view>
+          <view v-else-if="!availableSlots.length" class="slots-empty" data-testid="checkout-slots-empty">
+            该日期暂无可用配送时段
+          </view>
+          <view v-else class="slot-grid" data-testid="checkout-slot-grid">
+            <view
+              v-for="slot in availableSlots"
+              :key="slot.id"
+              class="slot-item"
+              :class="{
+                active: form.scheduled_slot_id === slot.id,
+                disabled: !slot.available
+              }"
+              @click="selectSlot(slot.id)"
+              @tap="selectSlot(slot.id)"
+              :data-testid="`checkout-slot-${slot.id}`"
+            >
+              <view class="slot-time">{{ slot.start_time }} - {{ slot.end_time }}</view>
+              <view class="slot-capacity">
+                <span v-if="!slot.available" class="slot-full">已约满</span>
+                <span v-else class="slot-available">剩余 {{ slot.capacity - slot.used_count }} 单</span>
+              </view>
+            </view>
+          </view>
+        </article>
+
         <article class="card" data-testid="checkout-form-card">
           <h3>{{ form.fulfillment_type === 'pickup' ? '联系人信息' : '收货信息' }}</h3>
           <div class="field">
@@ -216,6 +261,7 @@ import {
   validateCartForCheckout,
   validateCheckoutPayload,
   type CheckoutPayload,
+  type DeliverySlotWithAvailability,
   type FulfillmentType,
   type Merchant,
   type Product,
@@ -243,12 +289,31 @@ const availableCoupons = ref<UserCoupon[]>([]);
 const selectedCouponId = ref<number | null>(null);
 const couponPickerVisible = ref(false);
 const loadingCoupons = ref(false);
+const availableSlots = ref<DeliverySlotWithAvailability[]>([]);
+const loadingSlots = ref(false);
+const dateOptions = computed(() => {
+  const options = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const dateStr = date.toISOString().split('T')[0];
+    const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+    options.push({
+      value: dateStr,
+      label: i === 0 ? `今天 (${dateStr.slice(5)})` : i === 1 ? `明天 (${dateStr.slice(5)})` : `${weekDay} (${dateStr.slice(5)})`
+    });
+  }
+  return options;
+});
 const form = reactive({
   fulfillment_type: 'delivery' as FulfillmentType,
   receiver_name: '',
   receiver_phone: '',
   receiver_address: '',
-  remark: ''
+  remark: '',
+  scheduled_date: '' as string,
+  scheduled_slot_id: null as number | null
 });
 
 const routeMerchantId = ref(0);
@@ -324,7 +389,10 @@ async function loadData(): Promise<void> {
   }
 
   products.value = await dataSource.listProducts(merchant.value.id);
-  await loadAvailableCoupons();
+  if (form.fulfillment_type === 'delivery' && !form.scheduled_date && dateOptions.value.length) {
+    form.scheduled_date = dateOptions.value[0].value;
+  }
+  await Promise.all([loadAvailableCoupons(), loadAvailableSlots()]);
 }
 
 async function loadAvailableCoupons(): Promise<void> {
@@ -366,6 +434,51 @@ function setFulfillmentType(type: FulfillmentType): void {
     return;
   }
   form.fulfillment_type = type;
+  if (type === 'pickup') {
+    form.scheduled_date = '';
+    form.scheduled_slot_id = null;
+    availableSlots.value = [];
+  } else if (type === 'delivery' && !form.scheduled_date && dateOptions.value.length) {
+    form.scheduled_date = dateOptions.value[0].value;
+  }
+}
+
+async function loadAvailableSlots(): Promise<void> {
+  if (!merchant.value || form.fulfillment_type !== 'delivery' || !form.scheduled_date) {
+    availableSlots.value = [];
+    return;
+  }
+  try {
+    loadingSlots.value = true;
+    availableSlots.value = await dataSource.listAvailableDeliverySlots(
+      merchant.value.id,
+      form.scheduled_date
+    );
+    const stillAvailable = availableSlots.value.some(
+      (s) => s.id === form.scheduled_slot_id && s.available
+    );
+    if (!stillAvailable) {
+      form.scheduled_slot_id = null;
+    }
+  } catch (error) {
+    console.error('加载可用时段失败', error);
+    availableSlots.value = [];
+  } finally {
+    loadingSlots.value = false;
+  }
+}
+
+function selectDate(dateStr: string): void {
+  form.scheduled_date = dateStr;
+  form.scheduled_slot_id = null;
+  loadAvailableSlots();
+}
+
+function selectSlot(slotId: number): void {
+  const slot = availableSlots.value.find((s) => s.id === slotId);
+  if (slot && slot.available) {
+    form.scheduled_slot_id = slotId;
+  }
 }
 
 function openCouponPicker(): void {
@@ -421,7 +534,9 @@ async function submitOrder(): Promise<void> {
       receiver_phone: form.receiver_phone,
       receiver_address: form.receiver_address,
       remark: form.remark,
-      coupon_id: selectedCouponId.value ?? undefined
+      coupon_id: selectedCouponId.value ?? undefined,
+      scheduled_date: form.fulfillment_type === 'delivery' ? form.scheduled_date : undefined,
+      scheduled_slot_id: form.fulfillment_type === 'delivery' ? form.scheduled_slot_id ?? undefined : undefined
     };
 
     const payloadErrors = validateCheckoutPayload(payload);
@@ -469,6 +584,16 @@ watch(
   () => {
     if (merchant.value) {
       loadAvailableCoupons();
+      loadAvailableSlots();
+    }
+  }
+);
+
+watch(
+  () => form.scheduled_date,
+  () => {
+    if (merchant.value && form.fulfillment_type === 'delivery' && form.scheduled_date) {
+      loadAvailableSlots();
     }
   }
 );
@@ -479,3 +604,94 @@ onLoad((options) => {
 
 onShow(loadData);
 </script>
+
+<style lang="scss" scoped>
+.schedule-card {
+  h3 {
+    margin-bottom: 16rpx;
+  }
+}
+
+.date-selector {
+  margin-bottom: 24rpx;
+}
+
+.date-scroll {
+  white-space: nowrap;
+}
+
+.date-item {
+  display: inline-block;
+  padding: 16rpx 32rpx;
+  margin-right: 16rpx;
+  border: 2rpx solid #e5e5e5;
+  border-radius: 8rpx;
+  background: #fff;
+  font-size: 28rpx;
+  color: #333;
+  transition: all 0.2s;
+
+  &.active {
+    border-color: #4a90e2;
+    background: #e8f4ff;
+    color: #4a90e2;
+  }
+}
+
+.slots-loading,
+.slots-empty {
+  text-align: center;
+  padding: 32rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.slot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.slot-item {
+  flex: 0 0 calc(50% - 8rpx);
+  padding: 20rpx;
+  border: 2rpx solid #e5e5e5;
+  border-radius: 12rpx;
+  background: #fff;
+  text-align: center;
+  transition: all 0.2s;
+
+  &.active {
+    border-color: #4a90e2;
+    background: #e8f4ff;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    background: #f5f5f5;
+  }
+
+  &:not(.disabled):active {
+    transform: scale(0.98);
+  }
+}
+
+.slot-time {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.slot-capacity {
+  font-size: 24rpx;
+
+  .slot-full {
+    color: #e74c3c;
+  }
+
+  .slot-available {
+    color: #27ae60;
+  }
+}
+</style>

@@ -27,6 +27,14 @@ class Order(models.Model):
     receiver_phone = models.CharField(max_length=20)
     receiver_address = models.CharField(max_length=255)
     remark = models.CharField(max_length=255, blank=True, default='')
+    scheduled_date = models.DateField(null=True, blank=True)
+    scheduled_slot = models.ForeignKey(
+        'merchants.DeliverySlot',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='orders'
+    )
     items_amount = models.DecimalField(max_digits=10, decimal_places=2)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)

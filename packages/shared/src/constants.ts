@@ -14,7 +14,8 @@ export const STORAGE_KEYS = {
   aftersales: 'community_store_aftersales',
   announcements: 'community_store_announcements',
   promotions: 'community_store_promotions',
-  tickets: 'community_store_tickets'
+  tickets: 'community_store_tickets',
+  delivery_slots: 'community_store_delivery_slots'
 } as const;
 
 export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {

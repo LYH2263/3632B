@@ -11,7 +11,10 @@ class OrderAdmin(admin.ModelAdmin):
         'merchant',
         'status',
         'total_amount',
+        'scheduled_date',
+        'scheduled_slot',
         'created_at'
     )
     search_fields = ('order_no', 'receiver_name', 'receiver_phone')
-    list_filter = ('status', 'merchant')
+    list_filter = ('status', 'merchant', 'scheduled_date')
+    readonly_fields = ('scheduled_date', 'scheduled_slot')

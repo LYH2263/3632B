@@ -14,6 +14,8 @@ import {
   type CreateTicketPayload,
   type CreateTicketMessagePayload,
   type DataSource,
+  type DeliverySlot,
+  type DeliverySlotWithAvailability,
   type LoginPayload,
   type LoginResult,
   type Merchant,
@@ -357,5 +359,42 @@ export class ApiDataSource implements DataSource {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+  }
+
+  async listDeliverySlots(merchantId: number): Promise<DeliverySlot[]> {
+    return request<DeliverySlot[]>(`/delivery-slots?merchant_id=${merchantId}`);
+  }
+
+  async createDeliverySlot(
+    merchantId: number,
+    payload: Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>
+  ): Promise<DeliverySlot> {
+    return request<DeliverySlot>('/delivery-slots', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, merchant_id: merchantId })
+    });
+  }
+
+  async updateDeliverySlot(
+    slotId: number,
+    payload: Partial<Omit<DeliverySlot, 'id' | 'merchant_id' | 'created_at' | 'updated_at'>>
+  ): Promise<DeliverySlot> {
+    return request<DeliverySlot>(`/delivery-slots/${slotId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async deleteDeliverySlot(slotId: number): Promise<void> {
+    await request<void>(`/delivery-slots/${slotId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async listAvailableDeliverySlots(merchantId: number, date: string): Promise<DeliverySlotWithAvailability[]> {
+    const params = new URLSearchParams();
+    params.set('merchant_id', String(merchantId));
+    params.set('date', date);
+    return request<DeliverySlotWithAvailability[]>(`/delivery-slots/availability?${params.toString()}`);
   }
 }

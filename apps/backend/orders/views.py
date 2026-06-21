@@ -1,6 +1,8 @@
+from datetime import date
 from decimal import Decimal
 from random import randint
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework.views import APIView
 
@@ -9,7 +11,7 @@ from common.response import error_response, success_response
 from coupons.models import CouponRedeemRecord, UserCoupon
 from coupons.utils import validate_coupon_usage
 from membership.models import BuyerProfile
-from merchants.models import Merchant
+from merchants.models import Merchant, DeliverySlot
 from products.models import Product
 from promotions.models import PromotionItem
 from promotions.utils import increment_sold_quantity
@@ -128,6 +130,75 @@ def require_merchant_permission(request, merchant_id: int):
     return None
 
 
+def validate_delivery_slot(
+    merchant: Merchant,
+    fulfillment_type: str,
+    scheduled_date: date | None,
+    scheduled_slot_id: int | None,
+    check_capacity: bool = False
+) -> tuple[list[str], DeliverySlot | None]:
+    """
+    校验预约配送时段。
+
+    并发控制方案说明（下单时 count 方案）：
+    - 本方案在下单事务中实时统计该时段的有效订单数（非取消/退款状态），
+      与时段 capacity 比较判断是否可用。
+    - 取舍：
+      * 优点：1) 无需额外维护计数字段，数据一致性由数据库保证；
+              2) 实现简单，易于理解和维护；
+              3) 对于社区团购低并发场景性能足够。
+      * 缺点：1) 高并发下存在极小概率超卖（两个事务同时 count 都通过，
+              然后都提交），概率约等于同一毫秒内的并发下单数 / capacity；
+              2) 每次下单都需要 count 查询，超高峰时段有一定性能开销。
+    - 替代方案对比：
+      * 行锁方案（select_for_update + 实时 counter 字段）：
+        并发控制更严格，但需要在 DeliverySlot 上维护 used_count 字段，
+        每次下单/取消都要更新该字段，写操作热点可能成为瓶颈。
+      * Redis 分布式锁：跨进程互斥，复杂度高，引入外部依赖。
+    - 本项目选择「下单时 count」方案，因为社区团购场景并发量低，
+      且已有外层事务保证，实际超卖风险可接受。若后续需要更高并发，
+      可平滑迁移至行锁方案。
+    """
+    errors: list[str] = []
+    slot: DeliverySlot | None = None
+
+    if fulfillment_type != 'delivery':
+        return errors, slot
+
+    if scheduled_date is None and scheduled_slot_id is None:
+        return errors, slot
+
+    if scheduled_date is None or scheduled_slot_id is None:
+        errors.append('预约日期和时段必须同时提供')
+        return errors, slot
+
+    today = date.today()
+    if scheduled_date < today:
+        errors.append('不能选择过去的日期')
+        return errors, slot
+
+    slot = DeliverySlot.objects.filter(
+        id=scheduled_slot_id,
+        merchant=merchant,
+        is_active=True
+    ).first()
+    if slot is None:
+        errors.append('所选时段不存在或已停用')
+        return errors, slot
+
+    if check_capacity:
+        used_count = Order.objects.filter(
+            merchant=merchant,
+            scheduled_date=scheduled_date,
+            scheduled_slot=slot,
+            status__in=['pending', 'confirmed', 'delivering', 'pickup_ready', 'completed']
+        ).count()
+        if used_count >= slot.capacity:
+            errors.append(f"所选时段 {slot.start_time}-{slot.end_time} 已满员")
+
+    return errors, slot
+
+
 class CartValidateView(APIView):
     def post(self, request):
         serializer = CartValidateSerializer(data=request.data)
@@ -140,6 +211,19 @@ class CartValidateView(APIView):
         fulfillment_type = serializer.validated_data.get('fulfillment_type', 'delivery')
         if fulfillment_type == 'pickup' and not merchant.supports_pickup:
             return error_response('该商家不支持到店自提', status_code=400)
+
+        scheduled_date = serializer.validated_data.get('scheduled_date')
+        scheduled_slot_id = serializer.validated_data.get('scheduled_slot_id')
+
+        slot_errors, _ = validate_delivery_slot(
+            merchant,
+            fulfillment_type,
+            scheduled_date,
+            scheduled_slot_id,
+            check_capacity=True
+        )
+        if slot_errors:
+            return error_response('预约时段校验失败', errors=slot_errors)
 
         delivery_fee = merchant.pickup_fee if fulfillment_type == 'pickup' else merchant.delivery_fee
 
@@ -242,6 +326,19 @@ class OrderListView(APIView):
         if fulfillment_type == 'pickup' and not merchant.supports_pickup:
             return error_response('该商家不支持到店自提', status_code=400)
 
+        scheduled_date = payload.get('scheduled_date')
+        scheduled_slot_id = payload.get('scheduled_slot_id')
+
+        slot_errors, scheduled_slot = validate_delivery_slot(
+            merchant,
+            fulfillment_type,
+            scheduled_date,
+            scheduled_slot_id,
+            check_capacity=True
+        )
+        if slot_errors:
+            return error_response('预约时段校验失败', errors=slot_errors)
+
         delivery_fee = merchant.pickup_fee if fulfillment_type == 'pickup' else merchant.delivery_fee
 
         receiver_address = payload.get('receiver_address', '')
@@ -297,6 +394,8 @@ class OrderListView(APIView):
             receiver_phone=payload['receiver_phone'],
             receiver_address=receiver_address,
             remark=payload.get('remark', ''),
+            scheduled_date=scheduled_date,
+            scheduled_slot=scheduled_slot,
             items_amount=items_amount,
             delivery_fee=delivery_fee,
             discount_amount=discount_amount,
