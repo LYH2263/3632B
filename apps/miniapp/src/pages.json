@@ -77,6 +77,24 @@
       "style": {
         "navigationBarTitleText": "个人中心"
       }
+    },
+    {
+      "path": "pages/ticket/list",
+      "style": {
+        "navigationBarTitleText": "我的客服"
+      }
+    },
+    {
+      "path": "pages/ticket/detail",
+      "style": {
+        "navigationBarTitleText": "工单详情"
+      }
+    },
+    {
+      "path": "pages/ticket/create",
+      "style": {
+        "navigationBarTitleText": "创建工单"
+      }
     }
   ],
   "globalStyle": {

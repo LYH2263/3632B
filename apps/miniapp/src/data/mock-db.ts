@@ -18,12 +18,13 @@ import {
   type ProductPromotion,
   type ProductReview,
   type Promotion,
+  type Ticket,
   type User,
   type UserCoupon
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 8;
+const MOCK_DB_VERSION = 9;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -48,6 +49,7 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.aftersales, []);
     writeJSON(STORAGE_KEYS.announcements, seedAnnouncements);
     writeJSON(STORAGE_KEYS.promotions, seedPromotions);
+    writeJSON(STORAGE_KEYS.tickets, []);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
 
@@ -66,6 +68,7 @@ export function ensureMockDB(): void {
   ensureSeed<AfterSale[]>(STORAGE_KEYS.aftersales, []);
   ensureSeed<Announcement[]>(STORAGE_KEYS.announcements, seedAnnouncements);
   ensureSeed<Promotion[]>(STORAGE_KEYS.promotions, seedPromotions);
+  ensureSeed<Ticket[]>(STORAGE_KEYS.tickets, []);
 }
 
 export function readMerchants(): Merchant[] {
@@ -173,6 +176,15 @@ export function readPromotions(): Promotion[] {
 
 export function writePromotions(value: Promotion[]): void {
   writeJSON(STORAGE_KEYS.promotions, value);
+}
+
+export function readTickets(): Ticket[] {
+  ensureMockDB();
+  return readJSON(STORAGE_KEYS.tickets, []);
+}
+
+export function writeTickets(value: Ticket[]): void {
+  writeJSON(STORAGE_KEYS.tickets, value);
 }
 
 export function getActivePromotionForProduct(productId: number, now: Date = new Date()): ProductPromotion | null {

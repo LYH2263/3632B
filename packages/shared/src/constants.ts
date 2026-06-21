@@ -13,7 +13,8 @@ export const STORAGE_KEYS = {
   reviews: 'community_store_reviews',
   aftersales: 'community_store_aftersales',
   announcements: 'community_store_announcements',
-  promotions: 'community_store_promotions'
+  promotions: 'community_store_promotions',
+  tickets: 'community_store_tickets'
 } as const;
 
 export const COUPON_STATUS_LABELS: Record<CouponStatus, string> = {
@@ -86,4 +87,17 @@ export const POINT_SOURCE_LABELS: Record<import('./types').PointSource, string> 
   order_complete: '订单完成奖励',
   admin_adjust: '系统调整',
   deduct: '积分抵扣'
+};
+
+export const TICKET_TYPE_LABELS: Record<import('./types').TicketType, string> = {
+  delivery: '配送问题',
+  product: '商品问题',
+  other: '其他问题'
+};
+
+export const TICKET_STATUS_LABELS: Record<import('./types').TicketStatus, string> = {
+  open: '待处理',
+  processing: '处理中',
+  resolved: '已解决',
+  closed: '已关闭'
 };

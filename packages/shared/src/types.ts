@@ -414,4 +414,79 @@ export interface DataSource {
   updatePromotion(promotionId: number, payload: UpdatePromotionPayload): Promise<Promotion>;
   deletePromotion(promotionId: number): Promise<void>;
   getProductPromotion(productId: number): Promise<ProductPromotion | null>;
+
+  createTicket(payload: CreateTicketPayload): Promise<Ticket>;
+  listTicketsByBuyer(buyerId: number, page?: number, pageSize?: number): Promise<TicketListResult>;
+  listTicketsByMerchant(merchantId: number, page?: number, pageSize?: number): Promise<TicketListResult>;
+  getTicket(ticketId: number): Promise<Ticket | null>;
+  updateTicketStatus(ticketId: number, status: TicketStatus): Promise<Ticket>;
+  createTicketMessage(payload: CreateTicketMessagePayload): Promise<TicketMessage>;
+}
+
+export type TicketType = 'delivery' | 'product' | 'other';
+
+export type TicketStatus = 'open' | 'processing' | 'resolved' | 'closed';
+
+export interface TicketMessage {
+  id: number;
+  ticket_id: number;
+  sender_id: number;
+  sender_nickname: string;
+  sender_role: 'buyer' | 'merchant';
+  content: string;
+  created_at: string;
+}
+
+export interface Ticket {
+  id: number;
+  buyer_id: number;
+  buyer_nickname: string;
+  merchant_id: number;
+  merchant_name: string;
+  order_id?: number | null;
+  order_no?: string | null;
+  type: TicketType;
+  title: string;
+  description: string;
+  status: TicketStatus;
+  messages: TicketMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketListItem {
+  id: number;
+  buyer_id: number;
+  buyer_nickname: string;
+  merchant_id: number;
+  merchant_name: string;
+  order_id?: number | null;
+  order_no?: string | null;
+  type: TicketType;
+  title: string;
+  status: TicketStatus;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TicketListResult {
+  results: TicketListItem[];
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface CreateTicketPayload {
+  merchant_id: number;
+  order_id?: number | null;
+  type: TicketType;
+  title: string;
+  description: string;
+}
+
+export interface CreateTicketMessagePayload {
+  ticket_id: number;
+  content: string;
 }

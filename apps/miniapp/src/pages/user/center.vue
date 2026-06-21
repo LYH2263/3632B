@@ -69,6 +69,21 @@
             </view>
           </view>
         </view>
+
+        <view class="section-header">
+          <text class="section-title">客服中心</text>
+        </view>
+
+        <view class="service-cards">
+          <view class="service-card" @click="goToTickets">
+            <view class="service-icon">💬</view>
+            <view class="service-content">
+              <text class="service-title">联系客服</text>
+              <text class="service-desc">工单咨询 · 纠纷处理</text>
+            </view>
+            <view class="service-arrow">›</view>
+          </view>
+        </view>
       </template>
 
       <view v-else class="log-empty">
@@ -158,6 +173,10 @@ async function loadLogs(): Promise<void> {
   } finally {
     loadingLogs.value = false;
   }
+}
+
+function goToTickets(): void {
+  uni.navigateTo({ url: '/pages/ticket/list' });
 }
 
 onMounted(() => {
@@ -416,5 +435,62 @@ onMounted(() => {
 .log-balance {
   font-size: 11px;
   color: var(--muted);
+}
+
+.service-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.service-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all var(--transition);
+}
+
+.service-card:active {
+  transform: scale(0.98);
+  background: var(--bg-hover);
+}
+
+.service-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-radius: var(--radius);
+  font-size: 22px;
+}
+
+.service-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.service-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.service-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.service-arrow {
+  font-size: 20px;
+  color: var(--muted);
+  font-weight: 300;
 }
 </style>

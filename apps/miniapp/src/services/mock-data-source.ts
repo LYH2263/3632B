@@ -15,6 +15,8 @@ import {
   type CreateAfterSalePayload,
   type CreatePromotionPayload,
   type CreateReviewPayload,
+  type CreateTicketPayload,
+  type CreateTicketMessagePayload,
   type DataSource,
   type LoginPayload,
   type LoginResult,
@@ -29,6 +31,9 @@ import {
   type Promotion,
   type PromotionStatus,
   type ReplyReviewPayload,
+  type Ticket,
+  type TicketListResult,
+  type TicketStatus,
   type UpdatePromotionPayload,
   type UserCoupon,
   type CouponStatus
@@ -47,6 +52,7 @@ import {
   readProducts,
   readPromotions,
   readReviews,
+  readTickets,
   readUserCoupons,
   readUsers,
   writeAfterSales,
@@ -57,6 +63,7 @@ import {
   writeOrders,
   writePromotions,
   writeReviews,
+  writeTickets,
   writeUserCoupons,
   writeProducts
 } from '../data/mock-db';
@@ -812,5 +819,191 @@ export class MockDataSource implements DataSource {
 
   async getProductPromotion(productId: number): Promise<ProductPromotion | null> {
     return getActivePromotionForProduct(productId);
+  }
+
+  async createTicket(payload: CreateTicketPayload): Promise<Ticket> {
+    const merchants = readMerchants();
+    const merchant = merchants.find((m) => m.id === payload.merchant_id);
+    if (!merchant) {
+      throw new Error('商家不存在');
+    }
+
+    const orders = readOrders();
+    let order: Order | null = null;
+    if (payload.order_id) {
+      order = orders.find((o) => o.id === payload.order_id) ?? null;
+      if (!order) {
+        throw new Error('订单不存在');
+      }
+      if (order.merchant_id !== merchant.id) {
+        throw new Error('订单不属于该商家');
+      }
+    }
+
+    const users = readUsers();
+    const buyer = users.find((u) => u.role === 'buyer');
+    if (!buyer) {
+      throw new Error('买家不存在');
+    }
+
+    const tickets = readTickets();
+    const now = new Date().toISOString();
+
+    const newTicket: Ticket = {
+      id: nextId(tickets),
+      buyer_id: buyer.id,
+      buyer_nickname: buyer.nickname,
+      merchant_id: merchant.id,
+      merchant_name: merchant.name,
+      order_id: order?.id ?? null,
+      order_no: order?.order_no ?? null,
+      type: payload.type,
+      title: payload.title,
+      description: payload.description,
+      status: 'open',
+      messages: [
+        {
+          id: 1,
+          ticket_id: 0,
+          sender_id: buyer.id,
+          sender_nickname: buyer.nickname,
+          sender_role: 'buyer',
+          content: payload.description,
+          created_at: now
+        }
+      ],
+      created_at: now,
+      updated_at: now
+    };
+
+    newTicket.messages[0].ticket_id = newTicket.id;
+    tickets.push(newTicket);
+    writeTickets(tickets);
+    return newTicket;
+  }
+
+  async listTicketsByBuyer(buyerId: number, page = 1, pageSize = 10): Promise<TicketListResult> {
+    const tickets = readTickets()
+      .filter((t) => t.buyer_id === buyerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const results = tickets.slice(start, end).map((t) => ({
+      id: t.id,
+      buyer_id: t.buyer_id,
+      buyer_nickname: t.buyer_nickname,
+      merchant_id: t.merchant_id,
+      merchant_name: t.merchant_name,
+      order_id: t.order_id,
+      order_no: t.order_no,
+      type: t.type,
+      title: t.title,
+      status: t.status,
+      last_message_at: t.messages.length ? t.messages[t.messages.length - 1].created_at : t.created_at,
+      created_at: t.created_at,
+      updated_at: t.updated_at
+    }));
+
+    return {
+      results,
+      count: tickets.length,
+      page,
+      page_size: pageSize,
+      total_pages: Math.ceil(tickets.length / pageSize)
+    };
+  }
+
+  async listTicketsByMerchant(merchantId: number, page = 1, pageSize = 10): Promise<TicketListResult> {
+    const tickets = readTickets()
+      .filter((t) => t.merchant_id === merchantId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const results = tickets.slice(start, end).map((t) => ({
+      id: t.id,
+      buyer_id: t.buyer_id,
+      buyer_nickname: t.buyer_nickname,
+      merchant_id: t.merchant_id,
+      merchant_name: t.merchant_name,
+      order_id: t.order_id,
+      order_no: t.order_no,
+      type: t.type,
+      title: t.title,
+      status: t.status,
+      last_message_at: t.messages.length ? t.messages[t.messages.length - 1].created_at : t.created_at,
+      created_at: t.created_at,
+      updated_at: t.updated_at
+    }));
+
+    return {
+      results,
+      count: tickets.length,
+      page,
+      page_size: pageSize,
+      total_pages: Math.ceil(tickets.length / pageSize)
+    };
+  }
+
+  async getTicket(ticketId: number): Promise<Ticket | null> {
+    return readTickets().find((t) => t.id === ticketId) ?? null;
+  }
+
+  async updateTicketStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
+    const tickets = readTickets();
+    const idx = tickets.findIndex((t) => t.id === ticketId);
+    if (idx === -1) {
+      throw new Error('工单不存在');
+    }
+
+    tickets[idx] = {
+      ...tickets[idx],
+      status,
+      updated_at: new Date().toISOString()
+    };
+    writeTickets(tickets);
+    return tickets[idx];
+  }
+
+  async createTicketMessage(payload: CreateTicketMessagePayload): Promise<Ticket['messages'][0]> {
+    const tickets = readTickets();
+    const idx = tickets.findIndex((t) => t.id === payload.ticket_id);
+    if (idx === -1) {
+      throw new Error('工单不存在');
+    }
+
+    const ticket = tickets[idx];
+    if (ticket.status === 'closed') {
+      throw new Error('工单已关闭，无法回复');
+    }
+
+    const users = readUsers();
+    const merchant = users.find((u) => u.role === 'merchant' && u.merchant_id === ticket.merchant_id);
+    const sender = merchant ?? users.find((u) => u.role === 'buyer');
+    if (!sender) {
+      throw new Error('发送者不存在');
+    }
+
+    if (ticket.status === 'open' && sender.role === 'merchant') {
+      ticket.status = 'processing';
+    }
+
+    const now = new Date().toISOString();
+    const message: Ticket['messages'][0] = {
+      id: ticket.messages.length + 1,
+      ticket_id: ticket.id,
+      sender_id: sender.id,
+      sender_nickname: sender.nickname,
+      sender_role: sender.role,
+      content: payload.content,
+      created_at: now
+    };
+
+    ticket.messages.push(message);
+    ticket.updated_at = now;
+    tickets[idx] = ticket;
+    writeTickets(tickets);
+    return message;
   }
 }

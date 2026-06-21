@@ -11,6 +11,8 @@ import {
   type CreateAfterSalePayload,
   type CreatePromotionPayload,
   type CreateReviewPayload,
+  type CreateTicketPayload,
+  type CreateTicketMessagePayload,
   type DataSource,
   type LoginPayload,
   type LoginResult,
@@ -25,6 +27,9 @@ import {
   type Promotion,
   type PromotionStatus,
   type ReplyReviewPayload,
+  type Ticket,
+  type TicketListResult,
+  type TicketStatus,
   type UpdatePromotionPayload,
   type UserCoupon,
   type CouponStatus
@@ -311,5 +316,46 @@ export class ApiDataSource implements DataSource {
 
   async getProductPromotion(productId: number): Promise<ProductPromotion | null> {
     return request<ProductPromotion | null>(`/products/${productId}/promotion`);
+  }
+
+  async createTicket(payload: CreateTicketPayload): Promise<Ticket> {
+    return request<Ticket>('/tickets/create', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async listTicketsByBuyer(buyerId: number, page = 1, pageSize = 10): Promise<TicketListResult> {
+    const params = new URLSearchParams();
+    params.set('buyer_id', String(buyerId));
+    params.set('page', String(page));
+    params.set('page_size', String(pageSize));
+    return request<TicketListResult>(`/tickets?${params.toString()}`);
+  }
+
+  async listTicketsByMerchant(merchantId: number, page = 1, pageSize = 10): Promise<TicketListResult> {
+    const params = new URLSearchParams();
+    params.set('merchant_id', String(merchantId));
+    params.set('page', String(page));
+    params.set('page_size', String(pageSize));
+    return request<TicketListResult>(`/tickets?${params.toString()}`);
+  }
+
+  async getTicket(ticketId: number): Promise<Ticket | null> {
+    return request<Ticket | null>(`/tickets/${ticketId}`);
+  }
+
+  async updateTicketStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
+    return request<Ticket>(`/tickets/${ticketId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  }
+
+  async createTicketMessage(payload: CreateTicketMessagePayload): Promise<Ticket['messages'][0]> {
+    return request<Ticket['messages'][0]>('/tickets/messages', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
   }
 }

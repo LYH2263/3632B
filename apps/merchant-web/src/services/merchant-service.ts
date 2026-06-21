@@ -8,6 +8,7 @@ import {
   type AfterSale,
   type CouponRedeemRecord,
   type CreatePromotionPayload,
+  type CreateTicketMessagePayload,
   type LoginPayload,
   type Merchant,
   type Order,
@@ -17,6 +18,9 @@ import {
   type Promotion,
   type PromotionStatus,
   type ReplyReviewPayload,
+  type Ticket,
+  type TicketListResult,
+  type TicketStatus,
   type UpdatePromotionPayload,
   type User
 } from '@community-store/shared';
@@ -691,6 +695,123 @@ class MerchantService {
     }
 
     return getActivePromotionForProduct(productId);
+  }
+
+  async listTickets(merchantId: number, page = 1, pageSize = 10): Promise<TicketListResult> {
+    if (this.config.dataMode === 'api') {
+      const params = new URLSearchParams();
+      params.set('merchant_id', String(merchantId));
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
+      return request<TicketListResult>(`/tickets?${params.toString()}`);
+    }
+
+    const tickets = readJSON<Ticket[]>(STORAGE_KEYS.tickets, []);
+    const filtered = tickets.filter((t) => t.merchant_id === merchantId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    const results = filtered.slice(start, end).map((t) => ({
+      id: t.id,
+      buyer_id: t.buyer_id,
+      buyer_nickname: t.buyer_nickname,
+      merchant_id: t.merchant_id,
+      merchant_name: t.merchant_name,
+      order_id: t.order_id,
+      order_no: t.order_no,
+      type: t.type,
+      title: t.title,
+      status: t.status,
+      last_message_at: t.messages.length ? t.messages[t.messages.length - 1].created_at : t.created_at,
+      created_at: t.created_at,
+      updated_at: t.updated_at
+    }));
+
+    return {
+      results,
+      count: filtered.length,
+      page,
+      page_size: pageSize,
+      total_pages: Math.ceil(filtered.length / pageSize)
+    };
+  }
+
+  async getTicket(ticketId: number): Promise<Ticket | null> {
+    if (this.config.dataMode === 'api') {
+      return request<Ticket | null>(`/tickets/${ticketId}`);
+    }
+
+    const tickets = readJSON<Ticket[]>(STORAGE_KEYS.tickets, []);
+    return tickets.find((t) => t.id === ticketId) ?? null;
+  }
+
+  async updateTicketStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
+    if (this.config.dataMode === 'api') {
+      return request<Ticket>(`/tickets/${ticketId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+    }
+
+    const tickets = readJSON<Ticket[]>(STORAGE_KEYS.tickets, []);
+    const idx = tickets.findIndex((t) => t.id === ticketId);
+    if (idx === -1) {
+      throw new Error('工单不存在');
+    }
+
+    tickets[idx] = {
+      ...tickets[idx],
+      status,
+      updated_at: new Date().toISOString()
+    };
+    writeJSON(STORAGE_KEYS.tickets, tickets);
+    return tickets[idx];
+  }
+
+  async createTicketMessage(payload: CreateTicketMessagePayload): Promise<Ticket['messages'][0]> {
+    if (this.config.dataMode === 'api') {
+      return request<Ticket['messages'][0]>('/tickets/messages', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const tickets = readJSON<Ticket[]>(STORAGE_KEYS.tickets, []);
+    const idx = tickets.findIndex((t) => t.id === payload.ticket_id);
+    if (idx === -1) {
+      throw new Error('工单不存在');
+    }
+
+    const ticket = tickets[idx];
+    if (ticket.status === 'closed') {
+      throw new Error('工单已关闭，无法回复');
+    }
+
+    const users = readJSON<User[]>(STORAGE_KEYS.users, seedUsers);
+    const sender = users.find((u) => u.merchant_id === ticket.merchant_id);
+    if (!sender) {
+      throw new Error('发送者不存在');
+    }
+
+    if (ticket.status === 'open') {
+      ticket.status = 'processing';
+    }
+
+    const now = new Date().toISOString();
+    const message: Ticket['messages'][0] = {
+      id: ticket.messages.length + 1,
+      ticket_id: ticket.id,
+      sender_id: sender.id,
+      sender_nickname: sender.nickname,
+      sender_role: sender.role,
+      content: payload.content,
+      created_at: now
+    };
+
+    ticket.messages.push(message);
+    ticket.updated_at = now;
+    tickets[idx] = ticket;
+    writeJSON(STORAGE_KEYS.tickets, tickets);
+    return message;
   }
 }
 

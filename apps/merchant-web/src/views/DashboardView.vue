@@ -583,6 +583,195 @@
       </div>
     </el-card>
 
+    <el-card class="block" ref="ticketSection" data-testid="web-ticket-card">
+      <template #header>
+        <div class="block-title" data-testid="web-ticket-card-title">工单管理</div>
+      </template>
+
+      <div class="table-wrapper">
+      <el-table :data="tickets" stripe data-testid="web-ticket-table">
+        <el-table-column prop="id" label="工单号" width="80" />
+        <el-table-column label="问题类型" width="100">
+          <template #default="scope">{{ ticketTypeLabel(scope.row.type) }}</template>
+        </el-table-column>
+        <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
+        <el-table-column label="买家" width="120">
+          <template #default="scope">{{ scope.row.buyer_nickname }}</template>
+        </el-table-column>
+        <el-table-column label="关联订单" width="160">
+          <template #default="scope">
+            <span v-if="scope.row.order_no">{{ scope.row.order_no }}</span>
+            <span v-else style="color: #909399;">无</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="scope">
+            <el-tag :type="ticketStatusType(scope.row.status)" size="small">
+              {{ ticketStatusLabel(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最新消息" min-width="160">
+          <template #default="scope">
+            <div v-if="scope.row.messages && scope.row.messages.length">
+              <div style="font-size: 12px; color: #606266;">
+                {{ scope.row.messages[scope.row.messages.length - 1].content }}
+              </div>
+              <div style="font-size: 11px; color: #909399; margin-top: 2px;">
+                {{ new Date(scope.row.messages[scope.row.messages.length - 1].created_at).toLocaleString('zh-CN') }}
+              </div>
+            </div>
+            <span v-else style="color: #909399;">暂无消息</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="160">
+          <template #default="scope">
+            {{ new Date(scope.row.created_at).toLocaleString('zh-CN') }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="scope">
+            <el-button
+              size="small"
+              type="primary"
+              :data-testid="`web-ticket-detail-${scope.row.id}`"
+              @click="openTicketDetail(scope.row)"
+            >
+              查看
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      </div>
+
+      <div v-if="!tickets.length" style="text-align: center; padding: 30px 0; color: #909399;">
+        暂无工单
+      </div>
+
+      <div v-if="ticketsTotalPages > 1" style="text-align: center; margin-top: 20px;">
+        <el-pagination
+          layout="prev, pager, next"
+          :total="ticketsTotal"
+          :page-size="ticketsPageSize"
+          :current-page="ticketsPage"
+          @current-change="handleTicketsPageChange"
+          background
+        />
+      </div>
+    </el-card>
+
+    <el-dialog
+      v-model="ticketDetailVisible"
+      title="工单详情"
+      width="720px"
+      data-testid="web-ticket-detail-dialog"
+    >
+      <template v-if="activeTicket">
+        <div class="ticket-detail-header">
+          <div class="ticket-detail-info">
+            <div class="ticket-detail-title">{{ activeTicket.title }}</div>
+            <div class="ticket-detail-meta">
+              <el-tag :type="ticketStatusType(activeTicket.status)" size="small">
+                {{ ticketStatusLabel(activeTicket.status) }}
+              </el-tag>
+              <span style="margin-left: 8px; color: #909399;">
+                工单 #{{ activeTicket.id }} · {{ ticketTypeLabel(activeTicket.type) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ticket-detail-section">
+          <div class="ticket-detail-label">问题描述</div>
+          <div class="ticket-detail-description">{{ activeTicket.description }}</div>
+        </div>
+
+        <div v-if="activeTicket.order_no" class="ticket-detail-section">
+          <div class="ticket-detail-label">关联订单</div>
+          <div class="ticket-detail-value">{{ activeTicket.order_no }}</div>
+        </div>
+
+        <div class="ticket-detail-section">
+          <div class="ticket-detail-label">
+            消息记录
+            <span style="color: #909399; font-weight: normal; font-size: 12px;">
+              （共 {{ activeTicket.messages.length }} 条）
+            </span>
+          </div>
+          <div class="ticket-messages">
+            <div
+              v-for="msg in activeTicket.messages"
+              :key="msg.id"
+              class="ticket-message"
+              :class="{ 'is-self': msg.sender_role === 'merchant' }"
+            >
+              <div class="ticket-message-header">
+                <span class="ticket-message-sender">
+                  {{ msg.sender_nickname }}
+                  <el-tag size="mini" :type="msg.sender_role === 'merchant' ? 'primary' : 'success'">
+                    {{ msg.sender_role === 'merchant' ? '商家' : '买家' }}
+                  </el-tag>
+                </span>
+                <span class="ticket-message-time">
+                  {{ new Date(msg.created_at).toLocaleString('zh-CN') }}
+                </span>
+              </div>
+              <div class="ticket-message-content">{{ msg.content }}</div>
+            </div>
+            <div v-if="!activeTicket.messages.length" class="ticket-empty">
+              暂无消息记录
+            </div>
+          </div>
+        </div>
+
+        <div v-if="activeTicket.status !== 'closed'" class="ticket-reply-section">
+          <el-input
+            v-model="ticketMessageContent"
+            type="textarea"
+            :rows="3"
+            maxlength="1000"
+            show-word-limit
+            placeholder="请输入回复内容..."
+            data-testid="web-ticket-reply-input"
+          />
+          <div class="ticket-reply-actions">
+            <el-space>
+              <el-button
+                type="primary"
+                data-testid="web-ticket-reply-send"
+                @click="sendTicketMessage"
+              >
+                发送回复
+              </el-button>
+              <el-button
+                v-for="next in getNextTicketStatuses(activeTicket.status)"
+                :key="next"
+                :data-testid="`web-ticket-status-${activeTicket.id}-${next}`"
+                @click="updateTicketStatus(activeTicket.id, next)"
+              >
+                {{ ticketStatusLabel(next) }}
+              </el-button>
+            </el-space>
+          </div>
+        </div>
+
+        <div v-else class="ticket-closed-notice">
+          <el-alert
+            title="该工单已关闭，无法继续回复"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+        </div>
+      </template>
+
+      <template #footer>
+        <el-button data-testid="web-ticket-detail-close" @click="ticketDetailVisible = false">
+          关闭
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog
       v-model="replyDialogVisible"
       title="回复评价"
@@ -622,9 +811,12 @@ import {
   getPromotionStatusText,
   ORDER_STATUS_LABELS,
   STATUS_TRANSITIONS,
+  TICKET_STATUS_LABELS,
+  TICKET_TYPE_LABELS,
   type AfterSale,
   type CouponRedeemRecord,
   type CreatePromotionPayload,
+  type CreateTicketMessagePayload,
   type FulfillmentType,
   type Merchant,
   type Order,
@@ -633,6 +825,8 @@ import {
   type ProductReview,
   type Promotion,
   type PromotionStatus,
+  type Ticket,
+  type TicketStatus,
   type User
 } from '@community-store/shared';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -650,6 +844,11 @@ const couponRedeemRecords = ref<CouponRedeemRecord[]>([]);
 const reviews = ref<ProductReview[]>([]);
 const aftersales = ref<AfterSale[]>([]);
 const promotions = ref<Promotion[]>([]);
+const tickets = ref<Ticket[]>([]);
+const ticketsPage = ref(1);
+const ticketsPageSize = ref(10);
+const ticketsTotal = ref(0);
+const ticketsTotalPages = ref(0);
 
 const merchantForm = reactive({
   phone: '',
@@ -694,6 +893,13 @@ const promotionForm = reactive({
 });
 const selectedProductIds = ref<number[]>([]);
 
+const ticketDetailVisible = ref(false);
+const activeTicket = ref<Ticket | null>(null);
+const ticketMessageContent = ref('');
+const ticketStatusFilter = ref<TicketStatus | ''>('');
+
+const ticketSection = ref<{ $el: HTMLElement } | null>(null);
+
 const promotionSection = ref<{ $el: HTMLElement } | null>(null);
 
 const merchantSection = ref<{ $el: HTMLElement } | null>(null);
@@ -711,7 +917,8 @@ const sections = [
   { key: 'order', label: '订单管理' },
   { key: 'coupon', label: '核销记录' },
   { key: 'review', label: '评价管理' },
-  { key: 'aftersale', label: '售后审核' }
+  { key: 'aftersale', label: '售后审核' },
+  { key: 'ticket', label: '工单管理' }
 ];
 
 const sectionRefs: Record<string, typeof merchantSection> = {
@@ -721,7 +928,8 @@ const sectionRefs: Record<string, typeof merchantSection> = {
   order: orderSection,
   coupon: couponSection,
   review: reviewSection,
-  aftersale: aftersaleSection
+  aftersale: aftersaleSection,
+  ticket: ticketSection
 };
 
 const merchantId = computed(() => authUser.value?.merchant_id ?? 0);
@@ -804,6 +1012,97 @@ async function loadData(): Promise<void> {
   reviews.value = await merchantService.listReviews(merchantId.value);
   aftersales.value = await merchantService.listAfterSales(merchantId.value);
   promotions.value = await merchantService.listPromotions(merchantId.value);
+  await loadTickets();
+}
+
+async function loadTickets(): Promise<void> {
+  if (!merchantId.value) return;
+  const result = await merchantService.listTickets(merchantId.value, ticketsPage.value, ticketsPageSize.value);
+  tickets.value = result.results as unknown as Ticket[];
+  ticketsTotal.value = result.count;
+  ticketsTotalPages.value = result.total_pages;
+}
+
+function ticketTypeLabel(type: string): string {
+  return TICKET_TYPE_LABELS[type as keyof typeof TICKET_TYPE_LABELS] ?? type;
+}
+
+function ticketStatusLabel(status: string): string {
+  return TICKET_STATUS_LABELS[status as keyof typeof TICKET_STATUS_LABELS] ?? status;
+}
+
+function ticketStatusType(status: string): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
+    open: 'warning',
+    processing: 'warning',
+    resolved: 'success',
+    closed: 'info'
+  };
+  return map[status] ?? 'info';
+}
+
+function openTicketDetail(ticket: Ticket): void {
+  activeTicket.value = { ...ticket, messages: [...ticket.messages] };
+  ticketMessageContent.value = '';
+  ticketDetailVisible.value = true;
+}
+
+async function updateTicketStatus(ticketId: number, status: TicketStatus): Promise<void> {
+  try {
+    await merchantService.updateTicketStatus(ticketId, status);
+    ElMessage.success(`工单状态已更新为「${ticketStatusLabel(status)}」`);
+    await loadTickets();
+    if (activeTicket.value?.id === ticketId) {
+      activeTicket.value.status = status;
+    }
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function sendTicketMessage(): Promise<void> {
+  if (!activeTicket.value) return;
+  const content = ticketMessageContent.value.trim();
+  if (!content) {
+    ElMessage.error('回复内容不能为空');
+    return;
+  }
+  if (content.length > 1000) {
+    ElMessage.error('回复内容不能超过 1000 字');
+    return;
+  }
+  try {
+    const payload: CreateTicketMessagePayload = {
+      ticket_id: activeTicket.value.id,
+      sender_id: authUser.value!.id,
+      content
+    };
+    const message = await merchantService.createTicketMessage(payload);
+    activeTicket.value.messages.push(message);
+    if (activeTicket.value.status === 'open') {
+      activeTicket.value.status = 'processing';
+    }
+    ticketMessageContent.value = '';
+    await loadTickets();
+    ElMessage.success('回复已发送');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+function getNextTicketStatuses(status: TicketStatus): TicketStatus[] {
+  const transitions: Record<TicketStatus, TicketStatus[]> = {
+    open: ['processing', 'resolved', 'closed'],
+    processing: ['resolved', 'closed'],
+    resolved: ['closed', 'processing'],
+    closed: []
+  };
+  return transitions[status] ?? [];
+}
+
+async function handleTicketsPageChange(page: number): Promise<void> {
+  ticketsPage.value = page;
+  await loadTickets();
 }
 
 async function saveMerchant(): Promise<void> {
@@ -1125,3 +1424,120 @@ function logout(): void {
 
 onMounted(loadData);
 </script>
+
+<style scoped>
+.ticket-detail-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.ticket-detail-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.ticket-detail-meta {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.ticket-detail-section {
+  margin-bottom: 20px;
+}
+
+.ticket-detail-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.ticket-detail-description {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.ticket-detail-value {
+  font-size: 14px;
+  color: #606266;
+}
+
+.ticket-messages {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.ticket-message {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+.ticket-message.is-self {
+  background: #ecf5ff;
+  border-color: #b3d8ff;
+}
+
+.ticket-message:last-child {
+  margin-bottom: 0;
+}
+
+.ticket-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ticket-message-sender {
+  font-size: 13px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.ticket-message-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.ticket-message-content {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ticket-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
+.ticket-reply-section {
+  margin-top: 20px;
+}
+
+.ticket-reply-actions {
+  margin-top: 12px;
+  text-align: right;
+}
+
+.ticket-closed-notice {
+  margin-top: 20px;
+}
+</style>
