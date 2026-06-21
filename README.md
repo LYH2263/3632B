@@ -121,7 +121,8 @@ MINIAPP_API_BASE_URL=http://localhost:8000/api/v1
 - 买家账号：`buyer` / `buyer123`（角色为 `buyer`，用于买家端接口联调）
 - 商家账号：`merchant_fruit` / `merchant123`（绑定“鲜果超市”，可登录商家端）
 - 商家账号：`merchant_market` / `merchant123`（绑定“便民小超”，可登录商家端）
-- 示例业务数据：2 个商家、4 个商品
+- 商家账号：`merchant_bakery` / `merchant123`（绑定“晨光面包坊”，可登录商家端）
+- 示例业务数据：3 个商家、13 个商品、3 条公告、3 个促销活动
 
 补充说明：
 

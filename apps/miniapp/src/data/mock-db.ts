@@ -7,6 +7,9 @@ import {
   seedMerchants,
   seedProducts,
   seedPromotions,
+  seedReviews,
+  seedTickets,
+  seedUserCoupons,
   seedUsers,
   type AfterSale,
   type Announcement,
@@ -26,7 +29,7 @@ import {
 } from '@community-store/shared';
 import { readJSON, writeJSON } from './storage';
 
-const MOCK_DB_VERSION = 10;
+const MOCK_DB_VERSION = 11;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureSeed<T>(key: string, seed: T): T {
@@ -45,13 +48,13 @@ export function ensureMockDB(): void {
     writeJSON(STORAGE_KEYS.products, seedProducts);
     writeJSON(STORAGE_KEYS.users, seedUsers);
     writeJSON(STORAGE_KEYS.coupon_templates, seedCouponTemplates);
-    writeJSON(STORAGE_KEYS.user_coupons, []);
+    writeJSON(STORAGE_KEYS.user_coupons, seedUserCoupons);
     writeJSON(STORAGE_KEYS.coupon_redeem_records, []);
-    writeJSON(STORAGE_KEYS.reviews, []);
+    writeJSON(STORAGE_KEYS.reviews, seedReviews);
     writeJSON(STORAGE_KEYS.aftersales, []);
     writeJSON(STORAGE_KEYS.announcements, seedAnnouncements);
     writeJSON(STORAGE_KEYS.promotions, seedPromotions);
-    writeJSON(STORAGE_KEYS.tickets, []);
+    writeJSON(STORAGE_KEYS.tickets, seedTickets);
     writeJSON(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
     writeJSON(VERSION_KEY, MOCK_DB_VERSION);
   }
@@ -65,13 +68,13 @@ export function ensureMockDB(): void {
   });
   ensureSeed<User[]>(STORAGE_KEYS.users, seedUsers);
   ensureSeed<CouponTemplate[]>(STORAGE_KEYS.coupon_templates, seedCouponTemplates);
-  ensureSeed<UserCoupon[]>(STORAGE_KEYS.user_coupons, []);
+  ensureSeed<UserCoupon[]>(STORAGE_KEYS.user_coupons, seedUserCoupons);
   ensureSeed<CouponRedeemRecord[]>(STORAGE_KEYS.coupon_redeem_records, []);
-  ensureSeed<ProductReview[]>(STORAGE_KEYS.reviews, []);
+  ensureSeed<ProductReview[]>(STORAGE_KEYS.reviews, seedReviews);
   ensureSeed<AfterSale[]>(STORAGE_KEYS.aftersales, []);
   ensureSeed<Announcement[]>(STORAGE_KEYS.announcements, seedAnnouncements);
   ensureSeed<Promotion[]>(STORAGE_KEYS.promotions, seedPromotions);
-  ensureSeed<Ticket[]>(STORAGE_KEYS.tickets, []);
+  ensureSeed<Ticket[]>(STORAGE_KEYS.tickets, seedTickets);
   ensureSeed<DeliverySlot[]>(STORAGE_KEYS.delivery_slots, seedDeliverySlots);
 }
 

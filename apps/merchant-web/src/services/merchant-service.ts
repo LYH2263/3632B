@@ -84,7 +84,7 @@ function writeAuthSession(session: AuthSession): void {
   writeJSON(AUTH_KEY, session);
 }
 
-const MOCK_DB_VERSION = 4;
+const MOCK_DB_VERSION = 5;
 const VERSION_KEY = 'community_store_mock_db_version';
 
 function ensureMockStorage(): void {
